@@ -46,7 +46,7 @@ export function truncateAfterLastParenthesis(str) {
  */
 export function parseLooseDict(str) {
     const result = {};
-    const content = str.replace(/\s+/g, '').replace(/\\"/g, '"').slice(1, -1);
+    const content = str.replace(/\s+/g, ' ').replace(/\\"/g, '"').slice(1, -1); // Changed: preserve single spaces
     console.log("解析",content)
     let i = 0;
     const len = content.length;
@@ -98,7 +98,9 @@ export function parseLooseDict(str) {
             i++;
         }
 
-        result[key] = value.trim().replace(/,/g, '/'); // 替换逗号
+        // FIXED: Only replace commas that are not followed by spaces (semantic separators)
+        // Preserve "word, word" but convert "word,word" to "word/word"
+        result[key] = value.trim().replace(/,(?!\s)/g, '/'); 
 
         // 跳过分隔符和空格
         while (i < len && (content[i] === ',' || content[i] === ' ')) {
@@ -289,8 +291,9 @@ export function parseManualJson(jsonStr) {
             }
         }
 
-        // 替换逗号为斜杠（类似原函数的处理）
-        return result.replace(/,/g, '/');
+        // FIXED: Only replace commas that are not followed by spaces (semantic separators)
+        // Preserve "word, word" but convert "word,word" to "word/word"
+        return result.replace(/,(?!\s)/g, '/');
     }
 
     function parseNumber() {
