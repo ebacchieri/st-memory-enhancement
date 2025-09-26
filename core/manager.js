@@ -278,6 +278,45 @@ export const BASE = {
             hash_sheets[sheet.uid] = [sheet.hashSheet[0].map(hash => hash)]
         })
         return { hash_sheets }
+    },
+    getTableSpecificRules(tableName) {
+        switch(tableName) {
+            case "Memory Table":
+            case "Spacetime Table": 
+                return "retain only the latest row when multiple exist";
+            case "Character Features Table":
+                return "merge duplicate character entries";
+            case "Character Social Table":
+                return "delete rows containing <user>";
+            default:
+                return "apply standard processing rules";
+        }
+    },
+    processTableByType(tableName, operation) {
+        const englishTableName = this.translateTableName(tableName);
+        
+        switch(englishTableName) {
+            case "Memory Table":
+                return this.processMemoryTable(operation);
+            case "Character Features Table":
+                return this.processCharacterTable(operation);
+            case "Character Social Table":
+                return this.processSocialTable(operation);
+            default:
+                return this.processGenericTable(operation);
+        }
+    },
+    translateTableName(chineseName) {
+        const translations = {
+            "时空表格": "Spacetime Table",
+            "角色特征表格": "Character Features Table", 
+            "角色与<user>社交表格": "Character Social Table",
+            "任务、命令或者约定表格": "Tasks and Agreements Table",
+            "重要事件历史表格": "Important Events History Table",
+            "重要物品表格": "Important Items Table"
+        };
+        
+        return translations[chineseName] || chineseName;
     }
 };
 
