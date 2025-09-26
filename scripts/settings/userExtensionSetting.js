@@ -297,8 +297,8 @@ function InitBinging() {
             window.location.reload()
         }
     });
-    // 插件总体开关
-    '#table_switch'.change(function () {
+    // 插件总体开关 - FIXED: Added $ for jQuery selector
+    $('#table_switch').change(function () {
         USER.tableBaseSetting.isExtensionAble = this.checked;
         EDITOR.success(this.checked ? '插件已开启' : '插件已关闭，可以打开和手动编辑表格但AI不会读表和生成');
         updateSystemMessageTableStatus();   // 将表格数据状态更新到系统消息中
