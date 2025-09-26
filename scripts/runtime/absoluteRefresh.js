@@ -239,14 +239,6 @@ export async function rebuildTableActions(force = false, silentUpdate = USER.tab
         console.log('表头数据 (JSON):', tableHeadersText);
         console.log('重整理 - 最新的表格数据:', tableJsonText);
 
-        // 获取最近clear_up_stairs条聊天记录
-        const chat = USER.getContext().chat;
-        const lastChats = chatToBeUsed === '' ? await getRecentChatHistory(chat,
-            USER.tableBaseSetting.clear_up_stairs,
-            USER.tableBaseSetting.ignore_user_sent,
-            USER.tableBaseSetting.rebuild_token_limit_value
-        ) : chatToBeUsed;
-
         // 构建AI提示
         const select = USER.tableBaseSetting.lastSelectedTemplate ?? "rebuild_base"
         let template;
@@ -256,6 +248,7 @@ export async function rebuildTableActions(force = false, silentUpdate = USER.tab
                 name: "rebuild_base",
                 system_prompt: USER.tableBaseSetting.rebuild_default_system_message_template,
                 user_prompt_begin: USER.tableBaseSetting.rebuild_default_message_template,
+                include_history: true, // Default template always includes history
             };
         } else if (profile_prompts[select]) {
             // Template from profile_prompts.js
@@ -270,6 +263,22 @@ export async function rebuildTableActions(force = false, silentUpdate = USER.tab
             EDITOR.error('未找到对应的提示模板，请检查配置');
             return;
         }
+
+        // 根据模板配置决定是否获取聊天记录
+        let lastChats = '';
+        if (template.include_history !== false) {
+            // 获取最近clear_up_stairs条聊天记录
+            const chat = USER.getContext().chat;
+            lastChats = chatToBeUsed === '' ? await getRecentChatHistory(chat,
+                USER.tableBaseSetting.clear_up_stairs,
+                USER.tableBaseSetting.ignore_user_sent,
+                USER.tableBaseSetting.rebuild_token_limit_value
+            ) : chatToBeUsed;
+            console.log('包含聊天记录到重建提示中');
+        } else {
+            console.log('根据模板配置，跳过聊天记录获取');
+        }
+
         let systemPrompt = template.system_prompt
         let userPrompt = template.user_prompt_begin;
 
