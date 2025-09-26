@@ -330,15 +330,31 @@ export class Sheet extends SheetBase {
                 this.loadJson(targetSheetData)
                 return this;
             }
-            throw new Error('未找到对应的模板');
+            
+            // Try to find in global templates as fallback (migration support)
+            let fallbackTemplate = BASE.templates?.find(t => t.uid === target);
+            if (fallbackTemplate?.uid) {
+                console.log('Loading from global template as fallback for migration:', target);
+                this.loadJson(fallbackTemplate);
+                this.domain = 'chat';
+                this.uid = `sheet_${SYSTEM.generateRandomString(8)}`;
+                this.name = this.name.replace('模板', 'Table').replace('Template', 'Table');
+                this.template = fallbackTemplate;
+                return this;
+            }
+            
+            // If still not found, create a default Memory Table
+            console.warn(`Template not found for UID: ${target}, creating default Memory Table`);
+            this.createDefaultMemoryTable();
+            return this;
         }
         if (typeof target === 'object') {
             if (target.domain === SheetBase.SheetDomain.global) {
-                console.log('从模板转化表格', target, this);
+                console.log('Loading from template object', target, this);
                 this.loadJson(target)
                 this.domain = 'chat'
                 this.uid = `sheet_${SYSTEM.generateRandomString(8)}`;
-                this.name = this.name.replace('模板', '表格');
+                this.name = this.name.replace('模板', 'Table').replace('Template', 'Table');
                 this.template = target;
                 return this
             } else {
@@ -347,6 +363,42 @@ export class Sheet extends SheetBase {
             }
         }
     }
+    /**
+     * Create a default Memory Table when migration fails
+     */
+    createDefaultMemoryTable() {
+        this.init(5, 1); // 4 columns + 1 row header, 1 data row
+        this.uid = `sheet_${SYSTEM.generateRandomString(8)}`;
+        this.name = 'Memory Table';
+        this.domain = 'chat';
+        this.type = 'dynamic';
+        this.enable = true;
+        this.required = true;
+        this.triggerSend = true;
+        this.triggerSendDeep = 3;
+        
+        // Set up the default Memory Table structure
+        const headerCells = this.getCellsByRowIndex(0);
+        if (headerCells.length >= 5) {
+            headerCells[1].data.value = 'Place';
+            headerCells[2].data.value = 'Characters'; 
+            headerCells[3].data.value = 'Keys';
+            headerCells[4].data.value = 'Content';
+        }
+        
+        // Set up prompts and notes
+        this.source.data = {
+            note: 'Single memory table storing all contextual information with place, characters, keywords, and content descriptions',
+            initNode: 'This round must search for events from the context and insert them using insertRow function',
+            insertNode: 'When new significant events, character interactions, or location changes occur',
+            updateNode: 'When existing entries need content updates or clarification',
+            deleteNode: 'When entries become irrelevant or outdated'
+        };
+        
+        this.loadCells();
+        this.markPositionCacheDirty();
+    }
+
     /**
      * 获取表格编辑规则提示词
      * @returns

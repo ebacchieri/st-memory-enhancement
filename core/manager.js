@@ -125,16 +125,41 @@ export const BASE = {
             }
         }
     }),
-    getChatSheets(process=()=> {}) {
+    getChatSheets(process=() => {}) {
         DERIVED.any.chatSheetMap = DERIVED.any.chatSheetMap || {}
         const sheets = []
+        
+        // Ensure BASE.sheetsData.context exists
+        if (!BASE.sheetsData.context || BASE.sheetsData.context.length === 0) {
+            console.log("No chat sheets found, attempting to create default from templates");
+            BASE.initHashSheet(); // This will create default tables from templates
+        }
+        
         BASE.sheetsData.context.forEach(sheet => {
-            if (!DERIVED.any.chatSheetMap[sheet.uid]) {
-                const newSheet = new BASE.Sheet(sheet.uid)
-                DERIVED.any.chatSheetMap[sheet.uid] = newSheet
+            try {
+                if (!DERIVED.any.chatSheetMap[sheet.uid]) {
+                    const newSheet = new BASE.Sheet(sheet.uid)
+                    DERIVED.any.chatSheetMap[sheet.uid] = newSheet
+                }
+                process(DERIVED.any.chatSheetMap[sheet.uid])
+                sheets.push(DERIVED.any.chatSheetMap[sheet.uid])
+            } catch (error) {
+                console.error(`Failed to load sheet with UID ${sheet.uid}:`, error);
+                // Continue with other sheets instead of failing completely
+                EDITOR.warning(`Failed to load table: ${sheet.uid}. Creating default table instead.`);
+                
+                try {
+                    // Create a default sheet as fallback
+                    const defaultSheet = new BASE.Sheet();
+                    defaultSheet.createDefaultMemoryTable();
+                    defaultSheet.save();
+                    DERIVED.any.chatSheetMap[defaultSheet.uid] = defaultSheet;
+                    process(defaultSheet);
+                    sheets.push(defaultSheet);
+                } catch (fallbackError) {
+                    console.error('Failed to create fallback sheet:', fallbackError);
+                }
             }
-            process(DERIVED.any.chatSheetMap[sheet.uid])
-            sheets.push(DERIVED.any.chatSheetMap[sheet.uid])
         })
         return sheets
     },
@@ -267,12 +292,39 @@ export const BASE = {
         if (BASE.sheetsData.context.length === 0) {
             console.log("尝试从模板中构建表格数据")
             const {piece: currentPiece} = USER.getChatPiece()
-            buildSheetsByTemplates(currentPiece)
-            if (currentPiece?.hash_sheets) {
-                // console.log('使用模板创建了新的表格数据', currentPiece)
-                return currentPiece
+            
+            // Try to build from templates
+            try {
+                buildSheetsByTemplates(currentPiece)
+                if (currentPiece?.hash_sheets) {
+                    console.log('成功从模板创建表格', currentPiece)
+                    return currentPiece
+                }
+            } catch (templateError) {
+                console.warn('从模板构建失败，创建默认的记忆表格:', templateError);
+            }
+            
+            // Fallback: create a single default Memory Table
+            try {
+                const defaultSheet = BASE.createChatSheet(5, 1); // 4 columns + header
+                defaultSheet.createDefaultMemoryTable();
+                
+                const hash_sheets = {}
+                hash_sheets[defaultSheet.uid] = defaultSheet.hashSheet.map(row => row.map(hash => hash));
+                
+                if (currentPiece) {
+                    currentPiece.hash_sheets = hash_sheets;
+                    return currentPiece;
+                } else {
+                    return { hash_sheets };
+                }
+            } catch (defaultError) {
+                console.error('创建默认记忆表格失败:', defaultError);
+                // Return minimal structure to prevent further errors
+                return { hash_sheets: {} };
             }
         }
+        
         const hash_sheets = {}
         BASE.sheetsData.context.forEach(sheet => {
             hash_sheets[sheet.uid] = [sheet.hashSheet[0].map(hash => hash)]

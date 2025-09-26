@@ -298,7 +298,7 @@ function InitBinging() {
         }
     });
     // 插件总体开关
-    $('#table_switch').change(function () {
+    '#table_switch'.change(function () {
         USER.tableBaseSetting.isExtensionAble = this.checked;
         EDITOR.success(this.checked ? '插件已开启' : '插件已关闭，可以打开和手动编辑表格但AI不会读表和生成');
         updateSystemMessageTableStatus();   // 将表格数据状态更新到系统消息中
@@ -615,105 +615,146 @@ export function renderSetting() {
 export function loadSettings() {
     USER.IMPORTANT_USER_PRIVACY_DATA = USER.IMPORTANT_USER_PRIVACY_DATA || {};
 
-    // 旧版本提示词变更兼容
-    if (USER.tableBaseSetting.updateIndex < 3) {
-        USER.getSettings().message_template = USER.tableBaseDefaultSettings.message_template
-        USER.tableBaseSetting.to_chat_container = USER.tableBaseDefaultSettings.to_chat_container
-        // USER.tableBaseSetting.tableStructure = USER.tableBaseDefaultSettings.tableStructure
-        USER.tableBaseSetting.updateIndex = 3
+    // Check if migration is needed (increment updateIndex to 5)
+    if (USER.tableBaseSetting.updateIndex < 5) {
+        console.log("Triggering migration to new Memory Table format");
+        
+        // Clear any existing problematic data
+        if (USER.getContext().chatMetadata?.sheets) {
+            USER.getContext().chatMetadata.sheets = [];
+        }
+        
+        try {
+            initTableStructureToTemplate();
+            USER.tableBaseSetting.updateIndex = 5;
+            console.log("Migration completed successfully");
+        } catch (error) {
+            console.error("Migration failed:", error);
+            EDITOR.error("Table migration failed. Please check console for details.", error.message, error);
+        }
     }
 
-    // 2版本表格结构兼容
-    console.log("updateIndex", USER.tableBaseSetting.updateIndex)
-    if (USER.tableBaseSetting.updateIndex < 4) {
-        // tableStructureToTemplate(USER.tableBaseSetting.tableStructure)
-        initTableStructureToTemplate()
-        USER.tableBaseSetting.updateIndex = 4
-    }
-    if (USER.tableBaseSetting.deep < 0) formatDeep()
+    if (USER.tableBaseSetting.deep < 0) formatDeep();
 
     renderSetting();
     InitBinging();
-    initRefreshTypeSelector(); // 初始化表格刷新类型选择器
-    updateTableView(); // 更新表格视图
-    getSheetsCellStyle()
+    initRefreshTypeSelector();
+    updateTableView();
+    getSheetsCellStyle();
 }
 
 export function initTableStructureToTemplate() {
-    const sheetDefaultTemplates = USER.tableBaseSetting.tableStructure
-    USER.getSettings().table_selected_sheets = []
-    USER.getSettings().table_database_templates = [];
-    for (let defaultTemplate of sheetDefaultTemplates) {
-        const newTemplate = new BASE.SheetTemplate()
-        newTemplate.domain = 'global'
-        newTemplate.createNewTemplate(defaultTemplate.columns.length + 1, 1, false)
-        newTemplate.name = defaultTemplate.tableName
-        defaultTemplate.columns.forEach((column, index) => {
-            newTemplate.findCellByPosition(0, index + 1).data.value = column
-        })
-        newTemplate.enable = defaultTemplate.enable
-        newTemplate.tochat = defaultTemplate.tochat
-        newTemplate.required = defaultTemplate.Required
-        newTemplate.triggerSend = defaultTemplate.triggerSend
-        newTemplate.triggerSendDeep = defaultTemplate.triggerSendDeep
-        if(defaultTemplate.config)
-            newTemplate.config = JSON.parse(JSON.stringify(defaultTemplate.config))
-        newTemplate.source.data.note = defaultTemplate.note
-        newTemplate.source.data.initNode = defaultTemplate.initNode
-        newTemplate.source.data.deleteNode = defaultTemplate.deleteNode
-        newTemplate.source.data.updateNode = defaultTemplate.updateNode
-        newTemplate.source.data.insertNode = defaultTemplate.insertNode
-        USER.getSettings().table_selected_sheets.push(newTemplate.uid)
-        newTemplate.save()
-    }
-    USER.saveSettings()
-}
-
-function templateToTableStructure() {
-    const tableTemplates = BASE.templates.map((templateData, index) => {
-        const template = new BASE.SheetTemplate(templateData.uid)
-        return {
-            tableIndex: index,
-            tableName: template.name,
-            columns: template.hashSheet[0].slice(1).map(cellUid => template.cells.get(cellUid).data.value),
-            note: template.data.note,
-            initNode: template.data.initNode,
-            deleteNode: template.data.deleteNode,
-            updateNode: template.data.updateNode,
-            insertNode: template.data.insertNode,
-            config: JSON.parse(JSON.stringify(template.config)),
-            Required: template.required,
-            tochat: template.tochat,
-            enable: template.enable,
-            triggerSend: template.triggerSend,
-            triggerSendDeep: template.triggerSendDeep,
+    try {
+        const sheetDefaultTemplates = USER.tableBaseSetting.tableStructure || [];
+        
+        // Clear existing templates to avoid conflicts
+        USER.getSettings().table_selected_sheets = []
+        USER.getSettings().table_database_templates = [];
+        
+        // If no old structure exists, create the new default Memory Table template
+        if (sheetDefaultTemplates.length === 0) {
+            console.log("No existing table structure found, creating default Memory Table template");
+            createDefaultMemoryTableTemplate();
+            USER.saveSettings();
+            return;
         }
-    })
-    USER.tableBaseSetting.tableStructure = tableTemplates
-    USER.saveSettings()
+        
+        // Check if we already have the new Memory Table structure
+        const existingMemoryTable = sheetDefaultTemplates.find(template => 
+            template.tableName === "Memory Table" || 
+            template.columns?.includes("Place") && template.columns?.includes("Characters") && 
+            template.columns?.includes("Keys") && template.columns?.includes("Content")
+        );
+        
+        if (existingMemoryTable) {
+            console.log("Memory Table template already exists, using existing structure");
+            processExistingTemplate(existingMemoryTable);
+            USER.saveSettings();
+            return;
+        }
+        
+        // Migrate from old Chinese structure to new English structure
+        console.log("Migrating from old table structure to new Memory Table format");
+        
+        // Instead of migrating multiple tables, create a single Memory Table
+        createDefaultMemoryTableTemplate();
+        
+        // Optionally preserve old data by merging it (you can customize this logic)
+        // migrateOldTableData(sheetDefaultTemplates);
+        
+        USER.saveSettings();
+        
+    } catch (error) {
+        console.error("Migration failed, creating default Memory Table:", error);
+        try {
+            createDefaultMemoryTableTemplate();
+            USER.saveSettings();
+        } catch (fallbackError) {
+            console.error("Failed to create default template:", fallbackError);
+            EDITOR.error("Failed to initialize table templates. Please check your settings.", fallbackError.message, fallbackError);
+        }
+    }
 }
 
-/**
- * 刷新重整理模板
- */
-export function refreshRebuildTemplate() {
-    const templateSelect = $('#rebuild--select');
-    templateSelect.empty(); // 清空现有选项
-    const defaultOption = $('<option>', {
-        value: "rebuild_base",
-        text: "默认",
-    });
-    templateSelect.append(defaultOption);
-    Object.keys(USER.tableBaseSetting.rebuild_message_template_list).forEach(key => {
-        const option = $('<option>', {
-            value: key,
-            text: key
-        });
-        templateSelect.append(option);
-    });
-    // 设置默认选中项
-    if (USER.tableBaseSetting.lastSelectedTemplate) {
-        console.log("默认", USER.tableBaseSetting.lastSelectedTemplate)
-        $('#rebuild--select').val(USER.tableBaseSetting.lastSelectedTemplate);
+function createDefaultMemoryTableTemplate() {
+    const newTemplate = new BASE.SheetTemplate();
+    newTemplate.domain = 'global';
+    newTemplate.createNewTemplate(5, 1, false); // 4 columns + header
+    newTemplate.name = 'Memory Table';
+    
+    // Set column headers
+    const headerCells = newTemplate.getCellsByRowIndex(0);
+    if (headerCells.length >= 5) {
+        headerCells[1].data.value = 'Place';
+        headerCells[2].data.value = 'Characters'; 
+        headerCells[3].data.value = 'Keys';
+        headerCells[4].data.value = 'Content';
     }
+    
+    newTemplate.enable = true;
+    newTemplate.tochat = true;
+    newTemplate.required = true;
+    newTemplate.triggerSend = true;
+    newTemplate.triggerSendDeep = 3;
+    
+    newTemplate.source.data.note = 'Single memory table storing all contextual information with place, characters, keywords, and content descriptions';
+    newTemplate.source.data.initNode = 'This round must search for events from the context and insert them using insertRow function';
+    newTemplate.source.data.insertNode = 'When new significant events, character interactions, or location changes occur';
+    newTemplate.source.data.updateNode = 'When existing entries need content updates or clarification';
+    newTemplate.source.data.deleteNode = 'When entries become irrelevant or outdated';
+    
+    USER.getSettings().table_selected_sheets.push(newTemplate.uid);
+    newTemplate.save();
+    
+    console.log("Created default Memory Table template:", newTemplate);
+}
+
+function processExistingTemplate(template) {
+    const newTemplate = new BASE.SheetTemplate();
+    newTemplate.domain = 'global';
+    newTemplate.createNewTemplate(template.columns.length + 1, 1, false);
+    newTemplate.name = template.tableName;
+    
+    template.columns.forEach((column, index) => {
+        newTemplate.findCellByPosition(0, index + 1).data.value = column;
+    });
+    
+    newTemplate.enable = template.enable ?? true;
+    newTemplate.tochat = template.tochat ?? true;
+    newTemplate.required = template.Required ?? true;
+    newTemplate.triggerSend = template.triggerSend ?? true;
+    newTemplate.triggerSendDeep = template.triggerSendDeep ?? 3;
+    
+    if (template.config) {
+        newTemplate.config = JSON.parse(JSON.stringify(template.config));
+    }
+    
+    newTemplate.source.data.note = template.note || '';
+    newTemplate.source.data.initNode = template.initNode || '';
+    newTemplate.source.data.deleteNode = template.deleteNode || '';
+    newTemplate.source.data.updateNode = template.updateNode || '';
+    newTemplate.source.data.insertNode = template.insertNode || '';
+    
+    USER.getSettings().table_selected_sheets.push(newTemplate.uid);
+    newTemplate.save();
 }
