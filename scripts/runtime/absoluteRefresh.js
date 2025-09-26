@@ -61,15 +61,22 @@ function confirmTheOperationPerformed(content) {
     <table class="tableDom sheet-table">
         <thead>
             <tr>
-                ${table.columns.map(column => `<th>${column}</th>`).join('')}
+                ${Array.isArray(table.columns) ? table.columns.map(column => `<th>${column}</th>`).join('') : ''}
             </tr>
         </thead>
         <tbody>
-            ${table.content.map(row => `
+            ${Array.isArray(table.content) ? table.content.map(row => {
+                // Ensure row is an array before calling map
+                if (!Array.isArray(row)) {
+                    console.warn('Non-array row detected:', row);
+                    return '<tr><td colspan="100%">Invalid row data</td></tr>';
+                }
+                return `
             <tr>
-                ${row.map(cell => `<td>${cell}</td>`).join('')}
+                ${row.map(cell => `<td>${cell || ''}</td>`).join('')}
             </tr>
-            `).join('')}
+            `;
+            }).join('') : '<tr><td>No content data</td></tr>'}
         </tbody>
     </table>
 </div>
