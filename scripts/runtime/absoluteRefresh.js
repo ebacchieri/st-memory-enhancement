@@ -583,7 +583,153 @@ export async function rebuildTableActions(force = false, silentUpdate = USER.tab
     }
     // #endregion
 }
+export async function rebuildSheets() {
+    const container = document.createElement('div');
+    console.log('测试开始');
 
+    const style = document.createElement('style');
+    style.innerHTML = `
+        .rebuild-preview-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .rebuild-preview-text {
+            display: flex;
+            justify-content: left
+        }
+    `;
+    container.appendChild(style);
+
+    // Replace jQuery append with standard DOM methods
+    const h3Element = document.createElement('h3');
+    h3Element.textContent = '重建表格数据';
+    container.appendChild(h3Element);
+
+    const previewDiv1 = document.createElement('div');
+    previewDiv1.className = 'rebuild-preview-item';
+    previewDiv1.innerHTML = `<span>执行完毕后确认？：</span>${USER.tableBaseSetting.bool_silent_refresh ? '否' : '是'}`;
+    container.appendChild(previewDiv1);
+
+    const previewDiv2 = document.createElement('div');
+    previewDiv2.className = 'rebuild-preview-item';
+    previewDiv2.innerHTML = `<span>API：</span>${USER.tableBaseSetting.use_main_api ? '使用主API' : '使用备用API'}`;
+    container.appendChild(previewDiv2);
+
+    const hr = document.createElement('hr');
+    container.appendChild(hr);
+
+    // 创建选择器容器
+    const selectorContainer = document.createElement('div');
+    container.appendChild(selectorContainer);
+
+    // 添加提示模板选择器
+    const selectorContent = document.createElement('div');
+    selectorContent.innerHTML = `
+        <span class="rebuild-preview-text" style="margin-top: 10px">提示模板：</span>
+        <select id="rebuild_template_selector" class="rebuild-preview-text text_pole" style="width: 100%">
+            <option value="">加载中...</option>
+        </select>
+        <span class="rebuild-preview-text" style="margin-top: 10px">模板信息：</span>
+        <div id="rebuild_template_info" class="rebuild-preview-text" style="margin-top: 10px"></div>
+        <span class="rebuild-preview-text" style="margin-top: 10px">其他要求：</span>
+        <textarea id="rebuild_additional_prompt" class="rebuild-preview-text text_pole" style="width: 100%; height: 80px;"></textarea>
+    `;
+    selectorContainer.appendChild(selectorContent);
+
+    // 初始化选择器选项
+    const $selector = $(selectorContent.querySelector('#rebuild_template_selector'))
+    const $templateInfo = $(selectorContent.querySelector('#rebuild_template_info'))
+    const $additionalPrompt = $(selectorContent.querySelector('#rebuild_additional_prompt'))
+    $selector.empty(); // 清空加载中状态
+
+    // Add default template
+    $selector.append(
+        $('<option></option>')
+            .val('rebuild_base')
+            .text('Update + Auto-fix (Default Table Template)')
+    );
+
+    // Add templates from profile_prompts.js
+    try {
+        Object.entries(profile_prompts).forEach(([key, value]) => {
+            if (key !== 'rebuild_base') { // Skip default as we already added it
+                const displayName = (() => {
+                    switch (value.type) {
+                        case 'refresh':
+                            return '**Old** ' + (value.name || key);
+                        case 'third_party':
+                            return '**Third Party** ' + (value.name || key);
+                        default:
+                            return value.name || key;
+                    }
+                })();
+
+                $selector.append(
+                    $('<option></option>')
+                        .val(key)
+                        .text(displayName)
+                );
+            }
+        });
+    } catch (error) {
+        console.error('Failed to load profile_prompts templates:', error);
+    }
+
+    // Add custom templates
+    const customTemplates = USER.tableBaseSetting.rebuild_message_template_list || {};
+    Object.entries(customTemplates).forEach(([key, template]) => {
+        $selector.append(
+            $('<option></option>')
+                .val(key)
+                .text('**Custom** ' + (template.name || key))
+        );
+    });
+
+    // 设置默认选中项
+    const defaultTemplate = USER.tableBaseSetting?.lastSelectedTemplate || 'rebuild_base';
+    $selector.val(defaultTemplate);
+
+    // 更新模板信息显示
+    const updateTemplateInfo = (selectedTemplate) => {
+        if (selectedTemplate === 'rebuild_base') {
+            $templateInfo.text("默认模板，适用于Gemini，Grok，DeepSeek，使用聊天记录和表格信息重建表格，应用于初次填表、表格优化等场景。破限来源于TT老师。");
+        } else if (profile_prompts[selectedTemplate]) {
+            // Template from profile_prompts.js
+            const template = profile_prompts[selectedTemplate];
+            $templateInfo.text(template.info || template.name || '无模板信息');
+        } else if (customTemplates[selectedTemplate]) {
+            // Custom template
+            const template = customTemplates[selectedTemplate];
+            $templateInfo.text(template.info || '无模板信息');
+        } else {
+            $templateInfo.text('无模板信息');
+        }
+    };
+
+    // Initial info update
+    updateTemplateInfo(defaultTemplate);
+
+    // 监听选择器变化
+    $selector.on('change', function () {
+        const selectedTemplate = $(this).val();
+        updateTemplateInfo(selectedTemplate);
+    });
+
+    const confirmation = new EDITOR.Popup(container, EDITOR.POPUP_TYPE.CONFIRM, '', {
+        okButton: "继续",
+        cancelButton: "取消"
+    });
+
+    await confirmation.show();
+    if (confirmation.result) {
+        const selectedTemplate = $selector.val();
+        const additionalPrompt = $additionalPrompt.val();
+        USER.tableBaseSetting.lastSelectedTemplate = selectedTemplate; // 保存用户选择的模板
+        DERIVED.any.additionalPrompt = additionalPrompt; // 保存附加提示内容
+        getPromptAndRebuildTable();
+    }
+}
 // Remove comment marker that was breaking the export statement
 // 将tablesData解析回Table数组
 function tableDataToTables(tablesData) {
