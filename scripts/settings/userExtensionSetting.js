@@ -803,7 +803,7 @@ export function refreshRebuildTemplate() {
     templateSelect.append(defaultOption);
 
     // Add templates from profile_prompts.js
-    import('../data/profile_prompts.js').then(({ profile_prompts }) => {
+    import('../../data/profile_prompts.js').then(({ profile_prompts }) => {
         Object.entries(profile_prompts).forEach(([key, value]) => {
             if (key !== 'rebuild_base') { // Skip default as we already added it
                 const option = $('<option>', {
