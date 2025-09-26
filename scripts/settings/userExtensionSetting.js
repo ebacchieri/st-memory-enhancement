@@ -802,21 +802,62 @@ export function refreshRebuildTemplate() {
     });
     templateSelect.append(defaultOption);
 
-    // Add custom templates
-    const customTemplates = USER.tableBaseSetting.rebuild_message_template_list || {};
-    Object.keys(customTemplates).forEach(key => {
-        const template = customTemplates[key];
-        const option = $('<option>', {
-            value: key,
-            text: template.name || key
+    // Add templates from profile_prompts.js
+    import('../data/profile_prompts.js').then(({ profile_prompts }) => {
+        Object.entries(profile_prompts).forEach(([key, value]) => {
+            if (key !== 'rebuild_base') { // Skip default as we already added it
+                const option = $('<option>', {
+                    value: key,
+                    text: (() => {
+                        switch (value.type) {
+                            case 'refresh':
+                                return '**Old** ' + (value.name || key);
+                            case 'third_party':
+                                return '**Third Party** ' + (value.name || key);
+                            default:
+                                return value.name || key;
+                        }
+                    })()
+                });
+                templateSelect.append(option);
+            }
         });
-        templateSelect.append(option);
-    });
 
-    // Set default selected item
-    const lastSelected = USER.tableBaseSetting.lastSelectedTemplate;
-    if (lastSelected) {
-        console.log("Setting default selection:", lastSelected);
-        templateSelect.val(lastSelected);
-    }
+        // Add custom templates
+        const customTemplates = USER.tableBaseSetting.rebuild_message_template_list || {};
+        Object.keys(customTemplates).forEach(key => {
+            const template = customTemplates[key];
+            const option = $('<option>', {
+                value: key,
+                text: '**Custom** ' + (template.name || key)
+            });
+            templateSelect.append(option);
+        });
+
+        // Set default selected item
+        const lastSelected = USER.tableBaseSetting.lastSelectedTemplate;
+        if (lastSelected) {
+            console.log("Setting default selection:", lastSelected);
+            templateSelect.val(lastSelected);
+        }
+    }).catch(error => {
+        console.error('Failed to load profile_prompts:', error);
+        
+        // Fallback: Add custom templates only
+        const customTemplates = USER.tableBaseSetting.rebuild_message_template_list || {};
+        Object.keys(customTemplates).forEach(key => {
+            const template = customTemplates[key];
+            const option = $('<option>', {
+                value: key,
+                text: template.name || key
+            });
+            templateSelect.append(option);
+        });
+
+        // Set default selected item
+        const lastSelected = USER.tableBaseSetting.lastSelectedTemplate;
+        if (lastSelected) {
+            templateSelect.val(lastSelected);
+        }
+    });
 }
