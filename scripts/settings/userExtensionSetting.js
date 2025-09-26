@@ -758,3 +758,65 @@ function processExistingTemplate(template) {
     USER.getSettings().table_selected_sheets.push(newTemplate.uid);
     newTemplate.save();
 }
+
+function templateToTableStructure() {
+    const tableTemplates = BASE.templates.map((templateData, index) => {
+        const template = new BASE.SheetTemplate(templateData.uid)
+        return {
+            tableIndex: index,
+            tableName: template.name,
+            columns: template.hashSheet[0].slice(1).map(cellUid => template.cells.get(cellUid).data.value),
+            note: template.data.note,
+            initNode: template.data.initNode,
+            deleteNode: template.data.deleteNode,
+            updateNode: template.data.updateNode,
+            insertNode: template.data.insertNode,
+            config: JSON.parse(JSON.stringify(template.config)),
+            Required: template.required,
+            tochat: template.tochat,
+            enable: template.enable,
+            triggerSend: template.triggerSend,
+            triggerSendDeep: template.triggerSendDeep,
+        }
+    })
+    USER.tableBaseSetting.tableStructure = tableTemplates
+    USER.saveSettings()
+}
+
+/**
+ * 刷新重整理模板
+ */
+export function refreshRebuildTemplate() {
+    const templateSelect = $('#rebuild--select');
+    if (!templateSelect.length) {
+        console.warn('rebuild--select element not found');
+        return;
+    }
+
+    templateSelect.empty(); // 清空现有选项
+
+    // Add default option
+    const defaultOption = $('<option>', {
+        value: "rebuild_base",
+        text: "Default Template",
+    });
+    templateSelect.append(defaultOption);
+
+    // Add custom templates
+    const customTemplates = USER.tableBaseSetting.rebuild_message_template_list || {};
+    Object.keys(customTemplates).forEach(key => {
+        const template = customTemplates[key];
+        const option = $('<option>', {
+            value: key,
+            text: template.name || key
+        });
+        templateSelect.append(option);
+    });
+
+    // Set default selected item
+    const lastSelected = USER.tableBaseSetting.lastSelectedTemplate;
+    if (lastSelected) {
+        console.log("Setting default selection:", lastSelected);
+        templateSelect.val(lastSelected);
+    }
+}
