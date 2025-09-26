@@ -417,46 +417,159 @@ export async function rebuildTableActions(force = false, silentUpdate = USER.tab
                     for (const index in cleanContentTable) {
                         let sheet;
                         const table = cleanContentTable[index];
-                        if (table.tableUid){
-                            sheet = BASE.getChatSheet(table.tableUid)
-                        }else if(table.tableIndex !== undefined) {
-                            const uid = DERIVED.any.waitingTableIdMap[table.tableIndex]
-                            sheet = BASE.getChatSheet(uid)
-                        }else{
-                            const uid = DERIVED.any.waitingTableIdMap[index]
-                            sheet = BASE.getChatSheet(uid)
+                        console.log(`Processing table: ${table.tableName}, index: ${index}`, table);
+                        console.log('Available waiting tables:', DERIVED.any.waitingTableIdMap);
+                        
+                        // Method 1: Try to find by tableUid
+                        if (table.tableUid) {
+                            sheet = BASE.getChatSheet(table.tableUid);
+                            console.log(`Found sheet by tableUid ${table.tableUid}:`, sheet);
                         }
-                        if(!sheet) {
-                            console.error(`无法找到表格 ${table.tableName} 对应的sheet`);
+                        
+                        // Method 2: Try to find by tableIndex
+                        if (!sheet && table.tableIndex !== undefined) {
+                            const uid = DERIVED.any.waitingTableIdMap[table.tableIndex];
+                            if (uid) {
+                                sheet = BASE.getChatSheet(uid);
+                                console.log(`Found sheet by tableIndex ${table.tableIndex} -> UID ${uid}:`, sheet);
+                            }
+                        }
+                        
+                        // Method 3: Try to find by array index
+                        if (!sheet) {
+                            const uid = DERIVED.any.waitingTableIdMap[index];
+                            if (uid) {
+                                sheet = BASE.getChatSheet(uid);
+                                console.log(`Found sheet by array index ${index} -> UID ${uid}:`, sheet);
+                            }
+                        }
+                        
+                        // Method 4: Try to find by table name from all active sheets
+                        if (!sheet) {
+                            console.log(`Trying to find sheet by name: ${table.tableName}`);
+                            const allSheets = BASE.getChatSheets();
+                            console.log('All available sheets:', allSheets.map(s => ({name: s.name, uid: s.uid})));
+                            
+                            sheet = allSheets.find(s => {
+                                const sheetName = s.name || s.getName?.() || '';
+                                return sheetName === table.tableName || 
+                                       (table.tableName === 'Memory Table' && (sheetName.includes('Memory') || sheetName.includes('记忆'))) ||
+                                       sheetName.toLowerCase().includes(table.tableName.toLowerCase());
+                            });
+                            
+                            if (sheet) {
+                                console.log(`Found sheet by name matching: ${sheet.name}`);
+                            }
+                        }
+                        
+                        // Method 5: If still no sheet found and it's a Memory Table, get the first available sheet or create one
+                        if (!sheet && (table.tableName === 'Memory Table' || !table.tableName)) {
+                            console.log('No sheet found, trying to get first available sheet or create default Memory Table');
+                            const allSheets = BASE.getChatSheets();
+                            
+                            if (allSheets.length > 0) {
+                                sheet = allSheets[0]; // Use first available sheet
+                                console.log(`Using first available sheet: ${sheet.name}`);
+                            } else {
+                                // Create new Memory Table if none exist
+                                console.log('Creating new Memory Table as no sheets exist');
+                                try {
+                                    sheet = BASE.createChatSheet(5, 1); // 4 columns + header
+                                    sheet.createDefaultMemoryTable();
+                                    sheet.save(piece, true);
+                                    console.log('Created new default Memory Table:', sheet);
+                                } catch (createError) {
+                                    console.error(`Failed to create default Memory Table:`, createError);
+                                    EDITOR.error(`无法创建默认记忆表格`, createError.message);
+                                    continue;
+                                }
+                            }
+                        }
+                        
+                        // Method 6: Last resort - create a new sheet with the provided structure
+                        if (!sheet) {
+                            console.log(`Creating new sheet for table: ${table.tableName}`);
+                            try {
+                                const cols = Array.isArray(table.columns) ? table.columns.length : 4;
+                                const rows = Array.isArray(table.content) ? table.content.length : 1;
+                                sheet = BASE.createChatSheet(cols + 1, rows + 1); // +1 for header row and index column
+                                sheet.name = table.tableName || 'New Table';
+                                sheet.domain = 'chat';
+                                sheet.type = 'dynamic';
+                                sheet.enable = true;
+                                
+                                // Set up column headers if provided
+                                if (Array.isArray(table.columns)) {
+                                    const headerCells = sheet.getCellsByRowIndex(0);
+                                    table.columns.forEach((colName, colIndex) => {
+                                        if (headerCells[colIndex + 1]) {
+                                            headerCells[colIndex + 1].data.value = colName;
+                                        }
+                                    });
+                                }
+                                
+                                sheet.save(piece, true);
+                                console.log(`Created new sheet: ${sheet.name}`);
+                            } catch (createError) {
+                                console.error(`Failed to create sheet for ${table.tableName}:`, createError);
+                                EDITOR.error(`无法创建表格 ${table.tableName}`, createError.message);
+                                continue;
+                            }
+                        }
+                        
+                        if (!sheet) {
+                            console.error(`Still no sheet found for table: ${table.tableName}`);
+                            EDITOR.warning(`跳过表格 ${table.tableName}，无法找到或创建对应的数据结构`);
                             continue;
                         }
-                        const valueSheet = [table.columns, ...table.content].map(row => ['', ...row])
-                        sheet.rebuildHashSheetByValueSheet(valueSheet);
-                        sheet.save(piece, true)
+                        
+                        try {
+                            // Validate table structure
+                            if (!Array.isArray(table.columns) || !Array.isArray(table.content)) {
+                                console.error(`Invalid table structure for ${table.tableName}:`, table);
+                                EDITOR.warning(`表格 ${table.tableName} 数据结构无效，跳过处理`);
+                                continue;
+                            }
+                            
+                            // Build value sheet with proper structure
+                            const valueSheet = [table.columns, ...table.content].map(row => {
+                                if (!Array.isArray(row)) {
+                                    console.warn(`Non-array row in table ${table.tableName}:`, row);
+                                    return [''];  // Fallback to empty row
+                                }
+                                return ['', ...row];  // Add empty first column for sheet structure
+                            });
+                            
+                            console.log(`Rebuilding sheet ${sheet.name} with data:`, valueSheet);
+                            sheet.rebuildHashSheetByValueSheet(valueSheet);
+                            sheet.save(piece, true);
+                            
+                            console.log(`Successfully updated sheet: ${sheet.name}`);
+                        } catch (saveError) {
+                            console.error(`Failed to save sheet ${table.tableName}:`, saveError);
+                            EDITOR.error(`保存表格 ${table.tableName} 失败`, saveError.message);
+                        }
                     }
-                    await USER.getContext().saveChat(); // 等待保存完成
+                    
+                    try {
+                        await USER.getContext().saveChat();
+                        BASE.refreshContextView();
+                        updateSystemMessageTableStatus();
+                        EDITOR.success('生成表格成功！');
+                    } catch (saveError) {
+                        console.error('保存聊天记录失败:', saveError);
+                        EDITOR.error('保存聊天记录失败', saveError.message);
+                    }
                 } else {
                     throw new Error("聊天记录为空，请至少有一条聊天记录后再总结");
                 }
 
-                BASE.refreshContextView();
-                updateSystemMessageTableStatus();
-                EDITOR.success('生成表格成功！');
-            } catch (error) {
-                console.error('保存表格时出错:', error);
-                EDITOR.error(`生成表格失败`, error.message, error);
+            } catch (e) {
+                console.error('Error in rebuildTableActions:', e);
+                return;
+            } finally {
+
             }
-        } else {
-            EDITOR.error("生成表格保存失败：内容为空");
-            true
-        }
-
-    } catch (e) {
-        console.error('Error in rebuildTableActions:', e);
-        return;
-    } finally {
-
-    }
     // #endregion
 }
 
@@ -633,7 +746,6 @@ export async function rebuildSheets() {
 }
 
 
-// 将tablesData解析回Table数组
 function tableDataToTables(tablesData) {
     return tablesData.map(item => {
         // 强制确保 columns 是数组，且元素为字符串
