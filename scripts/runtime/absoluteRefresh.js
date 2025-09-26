@@ -209,6 +209,24 @@ export async function getPromptAndRebuildTable(templateName = '', additionalProm
 }
 
 /**
+ * Prevent duplicate Memory Tables by checking existing sheets
+ * @param {Array} sheets - Existing sheets array
+ * @param {string} tableName - Name of table to check
+ * @returns {Object|null} - Existing sheet or null
+ */
+function findExistingMemoryTable(sheets, tableName) {
+    if (tableName !== 'Memory Table') return null;
+
+    // Look for existing Memory Table variants
+    return sheets.find(sheet => {
+        const name = sheet.name || '';
+        return name === 'Memory Table' ||
+            name.includes('Memory') ||
+            name.includes('记忆') ||
+            name.includes('memory'); // case insensitive check
+    });
+}
+/**
  * 重新生成完整表格
  * @param {*} force 是否强制刷新
  * @param {*} silentUpdate  是否静默更新
@@ -414,6 +432,10 @@ export async function rebuildTableActions(force = false, silentUpdate = USER.tab
                 // 更新聊天记录
                 const { piece } = USER.getChatPiece()
                 if (piece) {
+                    // First, let's check if we already have existing sheets and prevent duplicates
+                    const existingSheets = BASE.getChatSheets();
+                    console.log('Existing sheets before processing:', existingSheets.map(s => ({name: s.name, uid: s.uid})));
+                    
                     for (const index in cleanContentTable) {
                         let sheet;
                         const table = cleanContentTable[index];
@@ -444,17 +466,14 @@ export async function rebuildTableActions(force = false, silentUpdate = USER.tab
                             }
                         }
                         
-                        // Method 4: Try to find by table name from all active sheets
+                        // Method 4: Try to find by table name from all active sheets (IMPROVED)
                         if (!sheet) {
                             console.log(`Trying to find sheet by name: ${table.tableName}`);
-                            const allSheets = BASE.getChatSheets();
-                            console.log('All available sheets:', allSheets.map(s => ({name: s.name, uid: s.uid})));
                             
-                            sheet = allSheets.find(s => {
+                            sheet = existingSheets.find(s => {
                                 const sheetName = s.name || s.getName?.() || '';
                                 return sheetName === table.tableName || 
-                                       (table.tableName === 'Memory Table' && (sheetName.includes('Memory') || sheetName.includes('记忆'))) ||
-                                       sheetName.toLowerCase().includes(table.tableName.toLowerCase());
+                                       (table.tableName === 'Memory Table' && (sheetName.includes('Memory') || sheetName.includes('记忆')));
                             });
                             
                             if (sheet) {
@@ -462,21 +481,33 @@ export async function rebuildTableActions(force = false, silentUpdate = USER.tab
                             }
                         }
                         
-                        // Method 5: If still no sheet found and it's a Memory Table, get the first available sheet or create one
+                        // Method 5: FIXED - For Memory Table, only create if NO memory-related table exists
                         if (!sheet && (table.tableName === 'Memory Table' || !table.tableName)) {
-                            console.log('No sheet found, trying to get first available sheet or create default Memory Table');
-                            const allSheets = BASE.getChatSheets();
+                            console.log('No sheet found for Memory Table, checking if any memory table already exists...');
                             
-                            if (allSheets.length > 0) {
-                                sheet = allSheets[0]; // Use first available sheet
-                                console.log(`Using first available sheet: ${sheet.name}`);
+                            // Check if any existing sheet could serve as a Memory Table
+                            const memorySheet = existingSheets.find(s => {
+                                const name = s.name || '';
+                                return name.includes('Memory') || name.includes('记忆') || name === 'Memory Table';
+                            });
+                            
+                            if (memorySheet) {
+                                sheet = memorySheet;
+                                console.log(`Using existing memory-related sheet: ${sheet.name}`);
+                            } else if (existingSheets.length > 0) {
+                                // Use the first available sheet if no specific memory table exists
+                                sheet = existingSheets[0];
+                                console.log(`Using first available sheet as Memory Table: ${sheet.name}`);
+                                // Optionally rename it to Memory Table
+                                sheet.name = 'Memory Table';
                             } else {
-                                // Create new Memory Table if none exist
+                                // Only create a new Memory Table if NO sheets exist at all
                                 console.log('Creating new Memory Table as no sheets exist');
                                 try {
-                                    sheet = BASE.createChatSheet(5, 1); // 4 columns + header
+                                    sheet = BASE.createChatSheet(5, 2); // 4 columns + header, 1 data row + header
                                     sheet.createDefaultMemoryTable();
                                     sheet.save(piece, true);
+                                    existingSheets.push(sheet); // Add to our tracking array
                                     console.log('Created new default Memory Table:', sheet);
                                 } catch (createError) {
                                     console.error(`Failed to create default Memory Table:`, createError);
@@ -486,14 +517,14 @@ export async function rebuildTableActions(force = false, silentUpdate = USER.tab
                             }
                         }
                         
-                        // Method 6: Last resort - create a new sheet with the provided structure
-                        if (!sheet) {
-                            console.log(`Creating new sheet for table: ${table.tableName}`);
+                        // Method 6: FIXED - Only create new sheet if it's NOT a Memory Table variant
+                        if (!sheet && table.tableName !== 'Memory Table' && table.tableName) {
+                            console.log(`Creating new sheet for non-memory table: ${table.tableName}`);
                             try {
                                 const cols = Array.isArray(table.columns) ? table.columns.length : 4;
                                 const rows = Array.isArray(table.content) ? table.content.length : 1;
                                 sheet = BASE.createChatSheet(cols + 1, rows + 1); // +1 for header row and index column
-                                sheet.name = table.tableName || 'New Table';
+                                sheet.name = table.tableName;
                                 sheet.domain = 'chat';
                                 sheet.type = 'dynamic';
                                 sheet.enable = true;
@@ -507,8 +538,9 @@ export async function rebuildTableActions(force = false, silentUpdate = USER.tab
                                         }
                                     });
                                 }
-                                
+            
                                 sheet.save(piece, true);
+                                existingSheets.push(sheet); // Add to our tracking array
                                 console.log(`Created new sheet: ${sheet.name}`);
                             } catch (createError) {
                                 console.error(`Failed to create sheet for ${table.tableName}:`, createError);
@@ -1192,3 +1224,4 @@ export async function executeIncrementalUpdateFromSummary(
         return 'error';
     }
 }
+
