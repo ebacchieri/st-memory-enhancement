@@ -168,20 +168,7 @@ export const defaultSettings = await switchLanguage('__defaultSettings__', {
 {{tableData}}
 
 # Memory Table Operations:
-After generating content, review each table based on the trigger conditions to determine if modifications are needed. If modifications are required, use the <tableEdit> tag with JavaScript function syntax following the OperateRule below.
-
-## Operation Rules (Must Follow Strictly)
-<OperateRule>
-- To insert a new row in a table, use insertRow function:
-  insertRow(tableIndex:number, data:{[colIndex:number]:string|number})
-  Example: insertRow(0, {0: "Library", 1: "Alice/Bob", 2: "study/research", 3: "Alice and Bob are studying for exams together"})
-- To delete a row from a table, use deleteRow function:
-  deleteRow(tableIndex:number, rowIndex:number)
-  Example: deleteRow(0, 0)
-- To update a row in a table, use updateRow function:
-  updateRow(tableIndex:number, rowIndex:number, data:{[colIndex:number]:string|number})
-  Example: updateRow(0, 0, {3: "Alice completed her research project"})
-</OperateRule>
+After generating content, generate summary of what just happened in the format of {place - characters - keywords - summary}, use short and descriptive language for summary, then use the <tableEdit> tag with JavaScript function syntax following this rule: insertRow(tableIndex:number, data:{[colIndex:number]:string|number}) to insert new row with that summary. Example: insertRow(0, {0: "Library", 1: "Alice/Bob", 2: "study/research", 3: "Alice and Bob are studying for exams together"})
 
 # Important Operation Principles (Must Follow)
 - When <user> requests table modifications, <user>'s requirements have the highest priority.
