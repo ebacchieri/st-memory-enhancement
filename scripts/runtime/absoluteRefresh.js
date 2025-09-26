@@ -249,11 +249,22 @@ export async function rebuildTableActions(force = false, silentUpdate = USER.tab
 
         // 构建AI提示
         const select = USER.tableBaseSetting.lastSelectedTemplate ?? "rebuild_base"
-        const template = select === "rebuild_base" ? {
-            name: "rebuild_base",
-            system_prompt: USER.tableBaseSetting.rebuild_default_system_message_template,
-            user_prompt_begin: USER.tableBaseSetting.rebuild_default_message_template,
-        } : USER.tableBaseSetting.rebuild_message_template_list[select]
+        let template;
+        
+        if (select === "rebuild_base") {
+            template = {
+                name: "rebuild_base",
+                system_prompt: USER.tableBaseSetting.rebuild_default_system_message_template,
+                user_prompt_begin: USER.tableBaseSetting.rebuild_default_message_template,
+            };
+        } else if (profile_prompts[select]) {
+            // Template from profile_prompts.js
+            template = profile_prompts[select];
+        } else {
+            // Custom template
+            template = USER.tableBaseSetting.rebuild_message_template_list[select];
+        }
+        
         if (!template) {
             console.error('未找到对应的提示模板，请检查配置', select, template);
             EDITOR.error('未找到对应的提示模板，请检查配置');
@@ -461,7 +472,6 @@ export async function rebuildSheets() {
     const container = document.createElement('div');
     console.log('测试开始');
 
-
     const style = document.createElement('style');
     style.innerHTML = `
         .rebuild-preview-item {
@@ -518,38 +528,78 @@ export async function rebuildSheets() {
     const $additionalPrompt = $(selectorContent.querySelector('#rebuild_additional_prompt'))
     $selector.empty(); // 清空加载中状态
 
-    const temps = USER.tableBaseSetting.rebuild_message_template_list
-    // 添加选项
-    Object.entries(temps).forEach(([key, prompt]) => {
+    // Add default template
+    $selector.append(
+        $('<option></option>')
+            .val('rebuild_base')
+            .text('Update + Auto-fix (Default Table Template)')
+    );
 
+    // Add templates from profile_prompts.js
+    try {
+        Object.entries(profile_prompts).forEach(([key, value]) => {
+            if (key !== 'rebuild_base') { // Skip default as we already added it
+                const displayName = (() => {
+                    switch (value.type) {
+                        case 'refresh':
+                            return '**Old** ' + (value.name || key);
+                        case 'third_party':
+                            return '**Third Party** ' + (value.name || key);
+                        default:
+                            return value.name || key;
+                    }
+                })();
+                
+                $selector.append(
+                    $('<option></option>')
+                        .val(key)
+                        .text(displayName)
+                );
+            }
+        });
+    } catch (error) {
+        console.error('Failed to load profile_prompts templates:', error);
+    }
+
+    // Add custom templates
+    const customTemplates = USER.tableBaseSetting.rebuild_message_template_list || {};
+    Object.entries(customTemplates).forEach(([key, template]) => {
         $selector.append(
             $('<option></option>')
                 .val(key)
-                .text(prompt.name || key)
+                .text('**Custom** ' + (template.name || key))
         );
     });
 
     // 设置默认选中项
-    // 从USER中读取上次选择的选项，如果没有则使用默认值
     const defaultTemplate = USER.tableBaseSetting?.lastSelectedTemplate || 'rebuild_base';
     $selector.val(defaultTemplate);
+    
     // 更新模板信息显示
-    if (defaultTemplate === 'rebuild_base') {
-        $templateInfo.text("默认模板，适用于Gemini，Grok，DeepSeek，使用聊天记录和表格信息重建表格，应用于初次填表、表格优化等场景。破限来源于TT老师。");
-    } else {
-        const templateInfo = temps[defaultTemplate]?.info || '无模板信息';
-        $templateInfo.text(templateInfo);
-    }
+    const updateTemplateInfo = (selectedTemplate) => {
+        if (selectedTemplate === 'rebuild_base') {
+            $templateInfo.text("默认模板，适用于Gemini，Grok，DeepSeek，使用聊天记录和表格信息重建表格，应用于初次填表、表格优化等场景。破限来源于TT老师。");
+        } else if (profile_prompts[selectedTemplate]) {
+            // Template from profile_prompts.js
+            const template = profile_prompts[selectedTemplate];
+            $templateInfo.text(template.info || template.name || '无模板信息');
+        } else if (customTemplates[selectedTemplate]) {
+            // Custom template
+            const template = customTemplates[selectedTemplate];
+            $templateInfo.text(template.info || '无模板信息');
+        } else {
+            $templateInfo.text('无模板信息');
+        }
+    };
 
+    // Initial info update
+    updateTemplateInfo(defaultTemplate);
 
     // 监听选择器变化
     $selector.on('change', function () {
         const selectedTemplate = $(this).val();
-        const template = temps[selectedTemplate];
-        $templateInfo.text(template.info || '无模板信息');
-    })
-
-
+        updateTemplateInfo(selectedTemplate);
+    });
 
     const confirmation = new EDITOR.Popup(container, EDITOR.POPUP_TYPE.CONFIRM, '', {
         okButton: "继续",
