@@ -13,13 +13,16 @@ export function replaceUserTag(str) {
 }
 
 /**
- * 将单元格中的逗号替换为/符号
+ * 将单元格中的逗号替换为/符号 (仅语义分隔符)
  * @param {string | number} cell
  * @returns 处理后的单元格值
  */
 export function handleCellValue(cell) {
     if (typeof cell === 'string') {
-        return cell.replace(/,/g, "/")
+        // Only replace commas that are not part of natural sentences
+        // Preserve commas followed by spaces (sentence structure)
+        // Replace commas without spaces (semantic separators)
+        return cell.replace(/,(?!\s)/g, "/")
     } else if (typeof cell === 'number') {
         return cell
     }
@@ -40,14 +43,27 @@ export function truncateAfterLastParenthesis(str) {
 }
 
 /**
+ * 智能替换逗号：保留句子中的逗号，只替换语义分隔符
+ * @param {string} text 
+ * @returns {string}
+ */
+function smartCommaReplace(text) {
+    // Replace commas that are:
+    // 1. Not followed by a space AND a lowercase letter (not sentence continuation)
+    // 2. Not between numbers (not decimal or thousands separator)
+    // 3. Not in common sentence patterns
+    return text.replace(/,(?![\s][a-z]|[\s]and|[\s]or|[\s]but|\d)/gi, '/');
+}
+
+/**
  * 解析字符串字典为对象
  * @param {*} str
  * @returns object
  */
 export function parseLooseDict(str) {
     const result = {};
-    const content = str.replace(/\s+/g, ' ').replace(/\\"/g, '"').slice(1, -1); // Changed: preserve single spaces
-    console.log("解析",content)
+    const content = str.replace(/\s+/g, ' ').replace(/\\"/g, '"').slice(1, -1);
+    console.log("解析", content)
     let i = 0;
     const len = content.length;
 
@@ -57,7 +73,7 @@ export function parseLooseDict(str) {
         while (i < len && content[i] !== ':') {
             key += content[i++];
         }
-        key = key.trim().replace(/^["']|["']$/g, ''); // 去除引号
+        key = key.trim().replace(/^["']|["']$/g, '');
         i++; // 跳过冒号
 
         // 读取 value
@@ -65,7 +81,6 @@ export function parseLooseDict(str) {
         let quoteChar = null;
         let inString = false;
 
-        // 判断起始引号（可以没有）
         if (content[i] === '"' || content[i] === "'") {
             quoteChar = content[i];
             inString = true;
@@ -76,10 +91,9 @@ export function parseLooseDict(str) {
             const char = content[i];
 
             if (inString) {
-                // 如果遇到嵌套引号，替换为另一种
                 if (char === quoteChar) {
                     if (content[i + 1] === ','||content[i + 1] == null) {
-                        i++; // 跳过结尾引号
+                        i++;
                         break;
                     } else {
                         value += char === '"' ? "'" : '"'
@@ -87,28 +101,23 @@ export function parseLooseDict(str) {
                         continue;
                     }
                 }
-
                 value += char;
             } else {
-                // 无引号字符串，直到逗号结束
                 if (char === ',') break;
                 value += char;
             }
-
             i++;
         }
 
-        // FIXED: Only replace commas that are not followed by spaces (semantic separators)
-        // Preserve "word, word" but convert "word,word" to "word/word"
-        result[key] = value.trim().replace(/,(?!\s)/g, '/'); 
+        // FIXED: Don't replace commas in content at all - preserve original text
+        // Only clean up the value by trimming whitespace
+        result[key] = value.trim();
 
-        // 跳过分隔符和空格
         while (i < len && (content[i] === ',' || content[i] === ' ')) {
             i++;
         }
     }
     console.log('解析后的对象:', result);
-
     return result;
 }
 
@@ -219,31 +228,27 @@ export function parseManualJson(jsonStr) {
     }
 
     function parseString() {
-        const quoteChar = str[index]; // '"' 或 "'"
+        const quoteChar = str[index];
         if (quoteChar !== '"' && quoteChar !== "'") {
             throw new Error(`期望引号在位置 ${index}`);
         }
 
-        index++; // 跳过起始引号
+        index++;
         let result = '';
 
         while (index < str.length) {
             const char = str[index];
 
             if (char === quoteChar) {
-                // 检查是否是转义的引号
                 if (index + 1 < str.length && str[index + 1] === quoteChar) {
-                    // 嵌套引号处理：连续两个相同引号当作一个引号
                     result += char;
-                    index += 2; // 跳过两个引号
+                    index += 2;
                     continue;
                 } else {
-                    // 结束引号
-                    index++; // 跳过结束引号
+                    index++;
                     break;
                 }
             } else if (char === '\\') {
-                // 处理转义字符
                 index++;
                 if (index >= str.length) {
                     throw new Error('意外的字符串结束');
@@ -273,7 +278,6 @@ export function parseManualJson(jsonStr) {
                         result += '\t';
                         break;
                     case 'u':
-                        // Unicode 转义
                         if (index + 4 >= str.length) {
                             throw new Error('不完整的 Unicode 转义');
                         }
@@ -291,9 +295,8 @@ export function parseManualJson(jsonStr) {
             }
         }
 
-        // FIXED: Only replace commas that are not followed by spaces (semantic separators)
-        // Preserve "word, word" but convert "word,word" to "word/word"
-        return result.replace(/,(?!\s)/g, '/');
+        // FIXED: Don't modify the content - return as-is
+        return result;
     }
 
     function parseNumber() {
