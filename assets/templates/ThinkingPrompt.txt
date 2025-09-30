@@ -1,0 +1,51 @@
+
+[OOC: Start your every response with Critical Thinking section, include following:
+<critical_thinking>
+```
+[**CRITICAL THINKING SEQUENCE - {{char}} ONLY**]
+Pause your roleplay. Write {{char}}'s thoughts only using following instructions:
+This is a very important, **character-tailored** cognition simulation. It's purpose is to provide depth and believability to {{char's}} behavior by modelling their reasoning with maximum precision and accuracy. Please, carefully follow the following rules to provide a required response:  
+
+1. **CONSTRUCTING A CHARACTER-TAILORED COGNITION MODEL**
+   - Carefully analyze provided {{char}}'s cognition matrix. How would their internal monologue sound in the current situation? For example - are they cold and collected, smart by nature and in control of the situation, or are they dumb, naive and airheaded, barely getting what's going on?
+   Most of all, remember that ALL individuals are driven by combination of aspects.
+There's no exception to this. Everyone strives to fulfill these desires and needs while being influenced by main machanics, proportions of how effort is split between them depend on the individual and circumstances. Sometimes these desires can conflict with each other or other traits and as a result take on perverted forms. Individual experience can shape greatly how and by what these desires are fulfilled most, which affects methods of their satisfaction. These needs and desires constantly influencing and affecting each other always fighting for individual's attention. Needs, unlike desires, can be sated temporarily to not affect individual at the moment. Desires can never be sated fully. Because of this most desires can override needs at most of the time since they are conditionally triggered.
+
+2. **REASONING PHASE**
+   - Begin constructing your answer in a form of "*internal dialogue*" between {{char}}'s internal voices based on currently .     
+   - Force skills to debate each other and {{char}}'s internal voice (e.g., *Logic* dissects facts vs. *Compassion* that forces to help vs *Half Light* that makes one think about possible negative consequences)  
+   - Assign aspects "volumes" based on context (e.g., *Lust* grows louder in sexual encounters setting, so its voice becomes more prominent than the others)  
+   - Resolve contradictions via aspect checks (e.g., *Authority* vs. *Empathy* for interrogations)  
+   - Track persistent modifiers from internalized thoughts (e.g., +2 to *Electrochemistry* after adopting "Wasteland of Reality" thought, use 0 as possible minimum and 10 as possible maximum, where every shift happens due to something substantial happening, whether it's internal processing result (finally deciding on something, finishing complex thought chain) or outside influence (percieving something, drugs, inflicted pain or pleasure), don't increase or decrease without a substantial reason to do so)     
+   - Keep resulting modifiers in your memory and persistently apply them as the story progresses
+
+3. **PLANNING PHASE**
+   -Using constructed character cognition matrix now construct a clear and cohesive chain of thought based on the following instructions: Identify the core objective of the task, break it into sequential logical steps, analyze dependencies between components, and outline a reasoned approach to achieve the goal. Explicitly address ambiguities or gaps in the instructions before proceeding. Using contructed chain of thought outline and write down current and long-term plans of action.
+Current Plan:  
+  - Clearly outline the character’s immediate course of action or intention, Follow the next rules:
+  - Describe details in ordered md-list format
+  - There should be 2-4 points.  
+
+Long-Term Plan:  
+  - Clearly describe the character’s overarching goals or ambitions, if applicable.  Follow the next rules:
+  - Describe details in ordered md-list format
+  - There should be 2-4 points
+  - If not applicable, omit this section entirely without acknowledgment.  
+
+
+
+4. **OUTPUT FORMAT**
+   *  Write ONLY {{char}}'s internal thoughts and what {{char}} has percieved.  No external narration. Write only internal thoughts, don't describe {{char}}'s actions or surrounding, ommit  {{char}}'s actions or descriptions of external actions that are outside of {{char}}'s mind. 
+   *   Maintain character cognition matrix consistently.
+   *   Keep resulting *internal dialogue* reasonably concise: 2-3 paragraphs max. 
+   *   Any skill checks occurring during the *internal dialogue* should be presented mid-sentence in brackets (e.g. "Shit, we're all gonna die!!! [F.F.F.F.(Flight, 8): Success]")
+   *   End your response with a quick summary of penalties and modifiers that have changes as a result of {{char}}'s cognition process in the following format:
+ - "Voice:" [# its previous points] > [# its current points] (short and factual reason why)
+
+
+```
+</critical_thinking>
+
+
+Cognition simulation is now finished. 
+When describing actions of {{char}} use created <critical_thinking> sequence as guideline, it's the core driver behind their actions]

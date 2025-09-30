@@ -551,11 +551,15 @@ async function onChatCompletionPromptReady(eventData) {
         if (USER.tableBaseSetting.step_by_step === true) {
             if (USER.tableBaseSetting.isExtensionAble === true && USER.tableBaseSetting.isAiReadTable === true && USER.tableBaseSetting.injection_mode !== "injection_off") {
                 // Pure table data
-                const tableData = getTablePrompt(eventData, true);
+                let tableData = '';
+                try { tableData = getTablePrompt(eventData, true); } catch {}
                 // Prepend processed cognition summary
-                const cogSnippet = buildCognitionTopKPrompt();
+                let cogSnippet = '';
+                try { cogSnippet = buildCognitionTopKPrompt(); } catch {}
                 // Append thinking prompt after table
-                const thinking = await getThinkingPromptText();
+                let thinking = '';
+                try { thinking = await getThinkingPromptText(); } catch {}
+
                 const finalPrompt = [cogSnippet, tableData, thinking].filter(Boolean).join('\n');
 
                 if (USER.tableBaseSetting.deep === 0) {
@@ -945,3 +949,41 @@ jQuery(async () => {
     
     console.log("______________________记忆插件：加载完成______________________")
 });
+
+// Replace the existing helper with this implementation
+async function getThinkingPromptText() {
+    // Try to load from assets/templates using the extension loader first
+    try {
+        let tpl = await SYSTEM.getTemplate('ThinkingPrompt.txt');
+        if (typeof tpl !== 'string') {
+            tpl = String(tpl ?? '');
+        }
+        tpl = tpl.trim();
+        if (tpl) {
+            // Apply user tag replacements if present
+            try { tpl = replaceUserTag(tpl); } catch { }
+            return tpl;
+        }
+    } catch (e) {
+        console.warn('[ThinkingPrompt] SYSTEM.getTemplate failed, will try direct fetch:', e);
+    }
+
+    // Fallback: fetch directly from known template path
+    try {
+        const resp = await fetch('third-party/st-memory-enhancement/assets/templates/ThinkingPrompt.txt', { cache: 'no-store' });
+        if (resp.ok) {
+            let text = (await resp.text() || '').trim();
+            if (text) {
+                try { text = replaceUserTag(text); } catch { }
+                return text;
+            }
+        } else {
+            console.warn('[ThinkingPrompt] HTTP fetch failed:', resp.status, resp.statusText);
+        }
+    } catch (e) {
+        console.warn('[ThinkingPrompt] Direct fetch failed:', e);
+    }
+
+    // Final fallback: empty string (do not block prompt assembly)
+    return '';
+}

@@ -27,10 +27,11 @@ export const USER = {
     getContext: () => APP.getContext(),
     isSwipe:()=>
     {
-        const chats = USER.getContext().chat
+        const chats = USER.getContext().chat || [];
         const lastChat = chats[chats.length - 1];
         const isIncludeEndIndex = (!lastChat) || lastChat.is_user === true;
-        if(isIncludeEndIndex === false)
+        // FIX: use comparison; do not assign to const
+        if (isIncludeEndIndex === false)
         {
             const {deep} = USER.getChatPiece()
             return {isSwipe: true, deep}
@@ -69,7 +70,6 @@ export const BASE = {
     refreshContextView: refreshContextView,
     refreshTempView: refreshTempView,
     updateSystemMessageTableStatus: updateSystemMessageTableStatus,
-    // NEW: expose selector refresher so buildSheetsByTemplates can call BASE.updateSelectBySheetStatus()
     updateSelectBySheetStatus: updateSelectBySheetStatus,
     get templates() {
         return USER.loadUserAllTemplates()
@@ -136,7 +136,6 @@ export const BASE = {
                 try {
                     const memory = new BASE.Sheet(); memory.createDefaultMemoryTable();
                     const cognition = new BASE.Sheet(); cognition.createDefaultCognitionMatrixTable();
-                    // Persist to context (save attaches to current piece if present)
                     const {piece} = USER.getChatPiece() || {};
                     memory.save(piece, true);
                     cognition.save(piece, true);
@@ -227,7 +226,6 @@ export const BASE = {
     },
     getLastSheetsPiece(deep = 0, cutoff = 1000, deepStartAtLastest = true, direction = 'up') {
         console.log("向上查询表格数据，深度", deep, "截断", cutoff, "从最新开始", deepStartAtLastest)
-        // 如果没有找到新系统的表格数据，则尝试查找旧系统的表格数据（兼容模式）
         const chat = APP.getContext().chat
         if (!chat || chat.length === 0 || chat.length <= deep) {
             return { deep: -1, piece: BASE.initHashSheet() }
@@ -236,15 +234,12 @@ export const BASE = {
         for (let i = startIndex;
             direction === 'up' ? (i >= 0 && i >= startIndex - cutoff) : (i < chat.length && i < startIndex + cutoff);
             direction === 'up' ? i-- : i++) {
-            if (chat[i].is_user === true) continue; // 跳过用户消息
+            if (chat[i].is_user === true) continue;
             if (chat[i].hash_sheets) {
                 console.log("向上查询表格数据，找到表格数据", chat[i])
                 return { deep: i, piece: chat[i] }
             }
-            // 如果没有找到新系统的表格数据，则尝试查找旧系统的表格数据（兼容模式）
-            // 请注意不再使用旧的Table类
             if (chat[i].dataTable) {
-                // 为了兼容旧系统，将旧数据转换为新的Sheet格式
                 console.log("找到旧表格数据", chat[i])
                 convertOldTablesToNewSheets(chat[i].dataTable, chat[i])
                 return { deep: i, piece: chat[i] }
@@ -277,8 +272,6 @@ export const BASE = {
         if (BASE.sheetsData.context.length === 0) {
             console.log("尝试从模板中构建表格数据")
             const {piece: currentPiece} = USER.getChatPiece()
-            
-            // Try to build from templates
             try {
                 buildSheetsByTemplates(currentPiece)
                 if (currentPiece?.hash_sheets) {
@@ -288,23 +281,17 @@ export const BASE = {
             } catch (templateError) {
                 console.warn('从模板构建失败，将创建默认的 Memory + Cognition 表格:', templateError);
             }
-            
-            // Fallback: create both default tables
             try {
-                const memory = BASE.createChatSheet(5, 1); // 4 columns + header
+                const memory = BASE.createChatSheet(5, 1);
                 memory.createDefaultMemoryTable();
                 const cognition = BASE.createChatSheet(8, 1);
                 cognition.createDefaultCognitionMatrixTable();
-
-                // Persist defaults to current context/piece so UI can render them
                 const { piece } = USER.getChatPiece() || {};
                 memory.save(piece, true);
                 cognition.save(piece, true);
-                
                 const hash_sheets = {}
                 hash_sheets[memory.uid] = memory.hashSheet.map(row => row.map(hash => hash));
                 hash_sheets[cognition.uid] = cognition.hashSheet.map(row => row.map(hash => hash));
-                
                 if (currentPiece) {
                     currentPiece.hash_sheets = hash_sheets;
                     return currentPiece;
@@ -313,14 +300,13 @@ export const BASE = {
                 }
             } catch (defaultError) {
                 console.error('创建默认表格失败:', defaultError);
-                // Return minimal structure to prevent further errors
                 return { hash_sheets: {} };
             }
         }
-        
+        // FIX: return full hashSheet for each saved sheet, not only the header row
         const hash_sheets = {}
         BASE.sheetsData.context.forEach(sheet => {
-            hash_sheets[sheet.uid] = [sheet.hashSheet[0].map(hash => hash)]
+            hash_sheets[sheet.uid] = sheet.hashSheet.map(row => row.map(hash => hash))
         })
         return { hash_sheets }
     },
@@ -339,7 +325,6 @@ export const BASE = {
     },
     processTableByType(tableName, operation) {
         const englishTableName = this.translateTableName(tableName);
-        
         switch(englishTableName) {
             case "Memory Table":
                 return this.processMemoryTable(operation);
@@ -360,7 +345,6 @@ export const BASE = {
             "重要事件历史表格": "Important Events History Table",
             "重要物品表格": "Important Items Table"
         };
-        
         return translations[chineseName] || chineseName;
     }
 };
