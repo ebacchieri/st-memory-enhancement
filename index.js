@@ -580,7 +580,33 @@ async function onChatCompletionPromptReady(eventData) {
             return;
         }
 
-        // 1) Build all parts
+        // Step-by-step mode: inject cognition + thinking into user message (preserve existing behavior)
+        if (USER.tableBaseSetting.step_by_step === true) {
+            if (USER.tableBaseSetting.isAiReadTable === true) {
+                // Pure table data
+                let tableData = '';
+                try { tableData = getTablePrompt(eventData, true); } catch {}
+                // Prepend processed cognition summary
+                let cogSnippet = '';
+                try { cogSnippet = buildCognitionTopKPrompt(); } catch {}
+                // Append thinking prompt after table
+                let thinking = '';
+                try { thinking = await getThinkingPromptText(); } catch {}
+
+                const finalPrompt = [cogSnippet, tableData, thinking].filter(Boolean).join('\n');
+
+                if (USER.tableBaseSetting.deep === 0) {
+                    eventData.chat.push({ role: getMesRole(), content: finalPrompt });
+                } else {
+                    eventData.chat.splice(-USER.tableBaseSetting.deep, 0, { role: getMesRole(), content: finalPrompt });
+                }
+            }
+            return;
+        }
+
+        // Regular mode: inject everything as separate system message according to injection settings
+        
+        // 1) Build all components that were previously injected into user message
         let cogSnippet = '';
         try { cogSnippet = buildCognitionTopKPrompt(); } catch {}
 
@@ -591,34 +617,26 @@ async function onChatCompletionPromptReady(eventData) {
         let thinking = '';
         try { thinking = await getThinkingPromptText(); } catch {}
 
-        const snippet = [cogSnippet, tableGuide, thinking]
+        // 2) Combine all components into single injection
+        const allContent = [cogSnippet, tableGuide, thinking]
             .filter(Boolean)
             .join('\n\n')
             .trim();
-        if (!snippet) return;
+        
+        if (!allContent) return;
 
-        // 2) Append into the last user message content (avoid duplicates)
+        // 3) Inject according to injection_mode and deep settings
         const chatArr = eventData.chat || [];
-        let injected = false;
-        for (let i = chatArr.length - 1; i >= 0; i--) {
-            const m = chatArr[i];
-            if (!m || m.role !== 'user' || typeof m.content !== 'string') continue;
-
-            const alreadyHas =
-                (cogSnippet && m.content.includes('Cognition Summary')) ||
-                (tableGuide && (m.content.includes('Memory Enhancement Tables Guide') || m.content.includes('【表格内容】'))) ||
-                (thinking && m.content.includes(thinking.slice(0, Math.min(thinking.length, 24))));
-
-            if (!alreadyHas) {
-                m.content = `${m.content}\n\n${snippet}`;
-            }
-            injected = true;
-            break;
-        }
-
-        // 3) Fallback: if no user message found, inject as a system message once
-        if (!injected) {
-            chatArr.push({ role: 'system', content: snippet });
+        const role = getMesRole(); // Get role from injection_mode
+        const deep = USER.tableBaseSetting.deep || 0;
+        
+        if (deep === 0) {
+            // Inject at the end
+            chatArr.push({ role, content: allContent });
+        } else {
+            // Inject at specified depth from the end
+            const insertIndex = Math.max(0, chatArr.length - deep);
+            chatArr.splice(insertIndex, 0, { role, content: allContent });
         }
 
         updateSheetsView();
