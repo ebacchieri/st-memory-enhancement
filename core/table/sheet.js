@@ -409,11 +409,11 @@ export class Sheet extends SheetBase {
         // Default priorities for circuits start at 1 (Value column = overall priority for sub stats)
         circuits.forEach(([name, desc]) => {
             if (name.includes('F.F.F.F.') || name.includes('Pain') || name.includes('Pleasure') || name.includes('Electrochemistry')) {                
-                insertRowAtEnd([name, desc, '1', '0', '', '0', 'no']); 
+                insertRow([name, desc, '1', '0', '', '0', 'no']); 
             }
             else
             {
-                insertRowAtEnd([name, desc, getRandomPriority().toString(), '0', getRandomModifier(), '0', 'no']);
+                insertRow([name, desc, getRandomPriority().toString(), '0', getRandomModifier(), '0', 'no']);
             }
             
         });
