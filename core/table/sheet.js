@@ -375,13 +375,13 @@ export class Sheet extends SheetBase {
             '50', '', 'Base Decay:-1/Logic Modifier:0', '0', 'no']);
         insertRow(['Logic',
             "Ability to create proper course of actions. Levels 0..5+, avg 2. Each level below 2: Complexity -2; above 2: Complexity +2.",
-            '2', '', '', '', 'no']);
+            getRandomValue(), '', '', '', 'no']);
         insertRow(['Self-awareness',
             'Defines how many circuits can be affected by Volition. Levels 0..5+; default 2.',
-            '2', '', '', '', 'no']);
+            getRandomValue(), '', '', '', 'no']);
         insertRow(['Volition',
             'Ability to resist/suppress a circuit or enforce change. Levels 0..5+; default 2.',
-            '2', '', '', '', 'no']);
+            getRandomValue(), '', '', '', 'no']);
 
         // Circuits (from CircuitsDefinition)
         const circuits = [
@@ -413,10 +413,7 @@ export class Sheet extends SheetBase {
             }
             esle
             {
-                const randomPriority = getRandomPriority();
-                const randomModifier = getRandomModifier();
-
-                insertRowAtEnd([name, desc, randomPriority.toString(), '0', randomModifier, '0', 'no']);
+                insertRowAtEnd([name, desc, getRandomPriority().toString(), '0', getRandomModifier(), '0', 'no']);
             }
             
         });
@@ -489,7 +486,29 @@ function getLatestChatHistory(chat, deep) {
 function getRandomPriority() {
     return Math.floor(Math.random() * 5) + 1;
 }
+function getRandomValue() {
+    const rand = Math.random();
 
+    // Person:-1 is baseline (most common)
+    // Person:-2 is twice as rare (0.5x probability)
+    // Person:1 is three times as rare (0.33x probability)
+
+    // Total weight: 1 + 0.5 + 0.33 = 1.83
+    // Normalize probabilities:
+    // Person:-1: 1/1.83 ≈ 0.546
+    // Person:-2: 0.5/1.83 ≈ 0.273
+    // Person:1: 0.33/1.83 ≈ 0.180
+
+    if (rand < 0.62) {
+        return '2';
+    } else if (rand < 0.93) { // 0.546 + 0.273
+        return '3';
+    } else if (rand < 0.98) { // 0.546 + 0.273
+    return '8';
+    } else {
+        return '5';
+    }
+}
 // Helper function to generate random modifier with specified probability distribution
 function getRandomModifier() {
     const rand = Math.random();

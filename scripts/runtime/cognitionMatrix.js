@@ -294,10 +294,7 @@ function ensureCircuitRows(sheet) {
             }
             esle
             {
-                const randomPriority = getRandomPriority();
-                const randomModifier = getRandomModifier();
-
-                insertRowAtEnd(sheet, [n, desc, randomPriority.toString(), '0', randomModifier, '0', 'no']);
+                insertRowAtEnd(sheet, [n, desc, getRandomPriority().toString(), '0', getRandomModifier(), '0', 'no']);
             }
             changed = true;
         });
