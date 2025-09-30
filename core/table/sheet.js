@@ -411,7 +411,7 @@ export class Sheet extends SheetBase {
             if (name.includes('F.F.F.F.') || name.includes('Pain') || name.includes('Pleasure') || name.includes('Electrochemistry')) {                
                 insertRowAtEnd([name, desc, '1', '0', '', '0', 'no']); 
             }
-            esle
+            else
             {
                 insertRowAtEnd([name, desc, getRandomPriority().toString(), '0', getRandomModifier(), '0', 'no']);
             }
@@ -504,7 +504,7 @@ function getRandomValue() {
     } else if (rand < 0.93) { // 0.546 + 0.273
         return '3';
     } else if (rand < 0.98) { // 0.546 + 0.273
-    return '8';
+    return '4';
     } else {
         return '5';
     }

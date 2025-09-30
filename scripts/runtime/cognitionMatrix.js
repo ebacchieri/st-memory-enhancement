@@ -216,7 +216,7 @@ function ensureMainRows(sheet) {
             insertRowAtEnd(sheet, [
                 'Logic',
                 'Ability to create proper actions. Levels 0..5+. Each level below 2: Complexity -2; above 2: Complexity +2.',
-                '2', '', '', '', 'no'
+                getRandomValue(), '', '', '', 'no'
             ]);
             changed = true;
         }
@@ -224,7 +224,7 @@ function ensureMainRows(sheet) {
             insertRowAtEnd(sheet, [
                 'Self-awareness',
                 'Defines how many circuits can be affected by Volition. Levels 0..5+; default 2.',
-                '2', '', '', '', 'no'
+                getRandomValue(), '', '', '', 'no'
             ]);
             changed = true;
         }
@@ -232,7 +232,7 @@ function ensureMainRows(sheet) {
             insertRowAtEnd(sheet, [
                 'Volition',
                 'Ability to resist/suppress a circuit or enforce change. Levels 0..5+; default 2.',
-                '2', '', '', '', 'no'
+                getRandomValue(), '', '', '', 'no'
             ]);
             changed = true;
         }
@@ -249,7 +249,29 @@ function ensureMainRows(sheet) {
 function getRandomPriority() {
     return Math.floor(Math.random() * 5) + 1;
 }
+function getRandomValue() {
+    const rand = Math.random();
 
+    // Person:-1 is baseline (most common)
+    // Person:-2 is twice as rare (0.5x probability)
+    // Person:1 is three times as rare (0.33x probability)
+
+    // Total weight: 1 + 0.5 + 0.33 = 1.83
+    // Normalize probabilities:
+    // Person:-1: 1/1.83 ≈ 0.546
+    // Person:-2: 0.5/1.83 ≈ 0.273
+    // Person:1: 0.33/1.83 ≈ 0.180
+
+    if (rand < 0.62) {
+        return '2';
+    } else if (rand < 0.93) { // 0.546 + 0.273
+        return '3';
+    } else if (rand < 0.98) { // 0.546 + 0.273
+        return '4';
+    } else {
+        return '5';
+    }
+}
 // Helper function to generate random modifier with specified probability distribution
 function getRandomModifier() {
     const rand = Math.random();
@@ -292,7 +314,7 @@ function ensureCircuitRows(sheet) {
             if (n.includes('F.F.F.F.') || n.includes('Pain') || n.includes('Pleasure') || n.includes('Electrochemistry')) {                
                 insertRowAtEnd(sheet, [n, desc, '1', '0', '', '0', 'no']);
             }
-            esle
+            else
             {
                 insertRowAtEnd(sheet, [n, desc, getRandomPriority().toString(), '0', getRandomModifier(), '0', 'no']);
             }
