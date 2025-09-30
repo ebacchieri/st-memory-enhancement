@@ -258,12 +258,16 @@ function handleTableEditTag(matches) {
  * @param {string[]} matches 新的匹配对象
  * @returns
  */
-function isTableEditStrChanged(chat, matches) {
-    if (chat.tableEditMatches != null && chat.tableEditMatches.join('') === matches.join('')) {
-        return false
+function isTableEditStrChanged(chat, matches, swipeId = null) {
+    // Use a per-message map keyed by swipe id (or 'mes' when not swiping)
+    if (!chat._tableEditMatches) chat._tableEditMatches = {};
+    const key = (swipeId !== null && swipeId !== undefined) ? `swipe_${swipeId}` : 'mes';
+    const joined = (matches || []).join('');
+    if (chat._tableEditMatches[key] != null && chat._tableEditMatches[key] === joined) {
+        return false;
     }
-    chat.tableEditMatches = matches
-    return true
+    chat._tableEditMatches[key] = joined;
+    return true;
 }
 
 /**
@@ -297,27 +301,34 @@ export function handleEditStrInMessage(chat, mesIndex = -1, ignoreCheck = false)
  * @param {boolean} ignoreCheck 是否跳过重复性检查
  */
 export function parseTableEditTag(piece, mesIndex = -1, ignoreCheck = false) {
-    const { matches } = getTableEditTag(piece.mes)
-    if (!ignoreCheck && !isTableEditStrChanged(piece, matches)) return false
-    const tableEditActions = handleTableEditTag(matches)
-    tableEditActions.forEach((action, index) => tableEditActions[index].action = classifyParams(formatParams(action.param)))
-    console.log("解析到的表格编辑指令", tableEditActions)
+    // Prefer current swipe content, fallback to mes
+    const sourceText =
+        (piece?.swipes && piece?.swipe_id != null && typeof piece.swipes[piece.swipe_id] === 'string')
+            ? piece.swipes[piece.swipe_id]
+            : piece.mes;
 
-    const { piece: prePiece } = mesIndex === -1 ? BASE.getLastSheetsPiece(1) : BASE.getLastSheetsPiece(mesIndex - 1, 1000, false)
-    const sheets = BASE.hashSheetsToSheets(prePiece.hash_sheets).filter(sheet => sheet.enable)
-    console.log("执行指令时的信息", sheets)
+    const { matches } = getTableEditTag(sourceText);
+    if (!ignoreCheck && !isTableEditStrChanged(piece, matches, piece?.swipe_id)) return false;
+
+    const tableEditActions = handleTableEditTag(matches);
+    tableEditActions.forEach((action, index) => tableEditActions[index].action = classifyParams(formatParams(action.param)));
+    console.log("解析到的表格编辑指令", tableEditActions);
+
+    const { piece: prePiece } = mesIndex === -1 ? BASE.getLastSheetsPiece(1) : BASE.getLastSheetsPiece(mesIndex - 1, 1000, false);
+    const sheets = BASE.hashSheetsToSheets(prePiece.hash_sheets).filter(sheet => sheet.enable);
+    console.log("执行指令时的信息", sheets);
     for (const EditAction of sortActions(tableEditActions)) {
-        executeAction(EditAction, sheets)
+        executeAction(EditAction, sheets);
     }
 
-    // NEW: Apply Cognition Matrix calculations before saving
-    try { updateCognitionMatrixAfterEdits(sheets); } catch(e){ console.warn('Cognition update skipped:', e); }
+    // Always recompute cognition after potential edits (or even if no edits)
+    try { updateCognitionMatrixAfterEdits(sheets); } catch (e) { console.warn('Cognition update skipped:', e); }
 
-    sheets.forEach(sheet => sheet.save(piece, true))
-    console.log("聊天模板：", BASE.sheetsData.context)
-    console.log("获取到的表格数据", prePiece)
-    console.log("测试总chat", USER.getContext().chat)
-    return true
+    sheets.forEach(sheet => sheet.save(piece, true));
+    console.log("聊天模板：", BASE.sheetsData.context);
+    console.log("获取到的表格数据", prePiece);
+    console.log("测试总chat", USER.getContext().chat);
+    return true;
 }
 
 // Also integrate into direct executor
@@ -671,15 +682,16 @@ export function getTableEditTag(mes) {
  * @param this_edit_mes_id 此消息的ID
  */
 async function onMessageEdited(this_edit_mes_id) {
-    if (USER.tableBaseSetting.isExtensionAble === false || USER.tableBaseSetting.step_by_step === true) return
-    const chat = USER.getContext().chat[this_edit_mes_id]
-    if (chat.is_user === true || USER.tableBaseSetting.isAiWriteTable === false) return
+    if (USER.tableBaseSetting.isExtensionAble === false || USER.tableBaseSetting.step_by_step === true) return;
+    const chat = USER.getContext().chat[this_edit_mes_id];
+    if (chat.is_user === true || USER.tableBaseSetting.isAiWriteTable === false) return;
     try {
-        handleEditStrInMessage(chat, parseInt(this_edit_mes_id))
+        // ignoreCheck = true forces a recalculation even if tags didn't change
+        handleEditStrInMessage(chat, parseInt(this_edit_mes_id), true);
     } catch (error) {
-        EDITOR.error("记忆插件：表格编辑失败\n原因：", error.message, error)
+        EDITOR.error("记忆插件：表格编辑失败\n原因：", error.message, error);
     }
-    updateSheetsView()
+    updateSheetsView();
 }
 
 /**
@@ -769,7 +781,8 @@ async function onMessageSwiped(chat_id) {
     console.log("滑动切换消息", chat)
     if (!chat.swipe_info[chat.swipe_id]) return
     try {
-        handleEditStrInMessage(chat)
+        // ignoreCheck = true so each swipe variant triggers a recomputation
+        handleEditStrInMessage(chat, -1, true);
     } catch (error) {
         EDITOR.error("记忆插件：swipe切换失败\n原因：", error.message, error)
     }
@@ -838,7 +851,9 @@ jQuery(async () => {
     // 版本检查
     fetch("http://api.muyoo.com.cn/check-version", {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clientVersion: VERSION, user: USER.getContext().name1 })
-    }).then(res => res.json()).then(res => {
+    })
+    .then(res => res.json())
+    .then(res => {
         if (res.success) {
             if (!res.isLatest) {
                 $("#tableUpdateTag").show()
@@ -848,6 +863,7 @@ jQuery(async () => {
             if (res.message) $("#table_message_tip").html(res.message)
         }
     })
+    .catch(err => console.error('版本检查请求失败:', err));
 
     $('.extraMesButtons').append('<div title="查看表格" class="mes_button open_table_by_id">表格</div>');
 
@@ -956,7 +972,7 @@ Pause your roleplay. Write {{char}}'s thoughts only using following instructions
 This is a very important, **character-tailored** cognition simulation. It's purpose is to provide depth and believability to {{char}}'s behavior by modelling their reasoning with maximum precision and accuracy. Please, carefully follow the following rules to provide a required response:  
 
 1. **CONSTRUCTING A CHARACTER-TAILORED COGNITION MODEL**
-   - Cognition matrix provided to you is a core of {{char}}'s cognition model. It consists of various active circuits (main and sub), each representing a different facet of {{char}}'s personality, skills, and drives. Each circuit has an priority score from 0 to 5, indicating its motivational drive (higher priority drives stronger), and fulfillment score from -2 to 2 indicating its magnitude of dissatisfaction/mismatch between wanted and real and its influence on {{char}}'s behavior (lower fulfillment drives individual stronger). 
+   - Cognition matrix provided to you is a core of {{char}}'s cognition model. It consists of various active circuits (main and sub), each representing a different facet of {{char}}'s personality, skills, and drives. Each circuit has an priority score from 0 to 10, indicating its motivational drive (higher priority drives stronger), and fulfillment score from -2 to 2 indicating its magnitude of dissatisfaction/mismatch between wanted and real and its influence on {{char}}'s behavior (lower fulfillment drives individual stronger). 
    - Carefully analyze provided {{char}}'s cognition matrix. How would their internal monologue sound in the current situation? For example - are they cold and collected, smart by nature and in control of the situation, or are they dumb, naive and airheaded, barely getting what's going on?
    Most of all, remember that ALL individuals are driven by combination of complexity, logic, volition, self-awarenes and circuits.
    - Consider how each circuit's priority and fulfillment values interact with one another. High priority circuits with low fulfillment will dominate {{char}}'s thoughts and actions, while low priority circuits with high fulfillment may be less influential.

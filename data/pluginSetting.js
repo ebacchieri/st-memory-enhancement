@@ -181,7 +181,7 @@ insertRow(0, {"0":"Library","1":"Alice/Bob","2":"study/research","3":"Alice and 
 Columns:
 - 0 Name
 - 1 Description
-- 2 Value (main stats: overall; circuits: priority 0..5)
+- 2 Value (main stats: overall; circuits: priority 0..10)
 - 3 Change (sub stats base change for this turn; you may append " ; v:+N" or " ; v:-N" for Volition this-turn delta)
 - 4 Modifiers (long-term modifiers list "name:value/name2:value2")
 - 5 Final Change (system-computed; do not modify)

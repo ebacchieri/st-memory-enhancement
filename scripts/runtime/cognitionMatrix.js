@@ -409,7 +409,7 @@ export function updateCognitionMatrixAfterEdits(allSheets) {
             const processedChange = r.excl ? 0 : finalChange;
 
             // Update priority = old - processedChange
-            const newPriority = clamp((r.priority ?? 0) - processedChange, 0, 5);
+            const newPriority = clamp((r.priority ?? 0) - processedChange, 0, 10);
             setCellValue(r.rowIdx, idxValue, String(newPriority));
 
             complexityDeltaFromCircuits += processedChange;
