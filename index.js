@@ -547,31 +547,7 @@ function getMesRole() {
  */
 async function onChatCompletionPromptReady(eventData) {
     try {
-        // Step-by-step
-        if (USER.tableBaseSetting.step_by_step === true) {
-            if (USER.tableBaseSetting.isExtensionAble === true && USER.tableBaseSetting.isAiReadTable === true && USER.tableBaseSetting.injection_mode !== "injection_off") {
-                // Pure table data
-                let tableData = '';
-                try { tableData = getTablePrompt(eventData, true); } catch {}
-                // Prepend processed cognition summary
-                let cogSnippet = '';
-                try { cogSnippet = buildCognitionTopKPrompt(); } catch {}
-                // Append thinking prompt after table
-                let thinking = '';
-                try { thinking = await getThinkingPromptText(); } catch {}
-
-                const finalPrompt = [cogSnippet, tableData, thinking].filter(Boolean).join('\n');
-
-                if (USER.tableBaseSetting.deep === 0) {
-                    eventData.chat.push({ role: getMesRole(), content: finalPrompt });
-                } else {
-                    eventData.chat.splice(-USER.tableBaseSetting.deep, 0, { role: getMesRole(), content: finalPrompt });
-                }
-            }
-            return;
-        }
-
-        // Regular mode checks
+        // Do not inject when disabled or dry run
         if (eventData.dryRun === true ||
             USER.tableBaseSetting.isExtensionAble === false ||
             USER.tableBaseSetting.isAiReadTable === false ||
@@ -579,24 +555,46 @@ async function onChatCompletionPromptReady(eventData) {
             return;
         }
 
-        // Original composed table prompt (with notes/edit rules)
-        const promptContent = initTableData(eventData);
-        // Prepend processed cognition summary
-        const cogSnippet = buildCognitionTopKPrompt();
-        // Append thinking prompt after table
-        const thinking = await getThinkingPromptText();
-        const merged = [cogSnippet, promptContent, thinking].filter(Boolean).join('\n');
+        // Build the snippet: Top-K cognition summary + Thinking prompt (no full table here)
+        let cogSnippet = '';
+        try { cogSnippet = buildCognitionTopKPrompt(); } catch {}
+        let thinking = '';
+        try { thinking = await getThinkingPromptText(); } catch {}
+        const snippet = [cogSnippet, thinking].filter(Boolean).join('\n').trim();
+        if (!snippet) return;
 
-        if (USER.tableBaseSetting.deep === 0)
-            eventData.chat.push({ role: getMesRole(), content: merged })
-        else
-            eventData.chat.splice(-USER.tableBaseSetting.deep, 0, { role: getMesRole(), content: merged })
+        // Inject into the last user message content
+        const chatArr = eventData.chat || [];
+        let injected = false;
+        for (let i = chatArr.length - 1; i >= 0; i--) {
+            const m = chatArr[i];
+            if (m && m.role === 'user' && typeof m.content === 'string') {
+                // Append snippet at the end of user's message
+                m.content = `${m.content}\n\n${snippet}`;
+                injected = true;
+                break;
+            }
+        }
 
-        updateSheetsView()
+        // Fallback: if no user message found, inject as a system message
+        if (!injected) {
+            const role = (function getMesRole() {
+                switch (USER.tableBaseSetting.injection_mode) {
+                    case 'deep_system': return 'system';
+                    case 'deep_user': return 'user';
+                    case 'deep_assistant': return 'assistant';
+                    default: return 'system';
+                }
+            })();
+            chatArr.push({ role, content: snippet });
+        }
+
+        // Update sheets status in UI
+        updateSheetsView();
     } catch (error) {
-        EDITOR.error(`记忆插件：表格数据注入失败\n原因：`,error.message, error);
+        EDITOR.error(`记忆插件：表格数据注入失败\n原因：`, error.message, error);
     }
-    console.log("注入表格总体提示词", eventData.chat)
+    console.log("注入表格总体提示词", eventData.chat);
 }
 
 /**
@@ -975,7 +973,7 @@ async function getThinkingPromptText() {
             \`\`\`
 [**CRITICAL THINKING SEQUENCE - {{char}} ONLY**]
 Pause your roleplay. Write {{char}}'s thoughts only using following instructions:
-This is a very important, **character-tailored** cognition simulation. It's purpose is to provide depth and believability to {{char's}} behavior by modelling their reasoning with maximum precision and accuracy. Please, carefully follow the following rules to provide a required response:  
+This is a very important, **character-tailored** cognition simulation. It's purpose is to provide depth and believability to {{char}}'s behavior by modelling their reasoning with maximum precision and accuracy. Please, carefully follow the following rules to provide a required response:  
 
 1. **CONSTRUCTING A CHARACTER-TAILORED COGNITION MODEL**
    - Cognition matrix provided to you is a core of {{char}}'s cognition model. It consists of various active circuits (main and sub), each representing a different facet of {{char}}'s personality, skills, and drives. Each circuit has an priority score from 0 to 5, indicating its motivational drive (higher priority drives stronger), and fulfillment score from -2 to 2 indicating its magnitude of dissatisfaction/mismatch between wanted and real and its influence on {{char}}'s behavior (lower fulfillment drives individual stronger). 
@@ -1011,7 +1009,7 @@ Long-Term Plan:
 
 
 4. **OUTPUT FORMAT**
-   *  Write ONLY {{char}}'s internal thoughts and what {{char}} has percieved.  No external narration. Write only internal thoughts, don't describe {{char}}'s actions or surrounding, ommit  {{char}}'s actions or descriptions of external actions that are outside of {{char}}'s mind. 
+   *  Write ONLY {{char}}'s internal thoughts and what {{char}} has percived.  No external narration. Write only internal thoughts, don't describe {{char}}'s actions or surrounding, ommit  {{char}}'s actions or descriptions of external actions that are outside of {{char}}'s mind. 
    *   Maintain character cognition matrix consistently.
    *   Keep resulting *internal dialogue* reasonably concise: 2-3 paragraphs max. 
    *   Any skill checks occurring during the *internal dialogue* should be presented mid-sentence in brackets (e.g. "Shit, we're all gonna die!!! [F.F.F.F.(Flight, 8): Success]")
