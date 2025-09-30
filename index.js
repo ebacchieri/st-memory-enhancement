@@ -952,25 +952,78 @@ jQuery(async () => {
 
 // Replace the existing helper with this implementation
 async function getThinkingPromptText() {
-    // Try to load from assets/templates using the extension loader first
-    try {
-        let tpl = await SYSTEM.getTemplate('ThinkingPrompt.txt');
-        if (typeof tpl !== 'string') {
-            tpl = String(tpl ?? '');
-        }
-        tpl = tpl.trim();
-        if (tpl) {
-            // Apply user tag replacements if present
-            try { tpl = replaceUserTag(tpl); } catch { }
-            return tpl;
-        }
-    } catch (e) {
-        console.warn('[ThinkingPrompt] SYSTEM.getTemplate failed, will try direct fetch:', e);
-    }
+    //// Try to load from assets/templates using the extension loader first
+    //try {
+    //    let tpl = await SYSTEM.getTemplate('ThinkingPrompt.txt');
+    //    if (typeof tpl !== 'string') {
+    //        tpl = String(tpl ?? '');
+    //    }
+    //    tpl = tpl.trim();
+    //    if (tpl) {
+    //        // Apply user tag replacements if present
+    //        try { tpl = replaceUserTag(tpl); } catch { }
+    //        return tpl;
+    //    }
+    //} catch (e) {
+    //    console.warn('[ThinkingPrompt] SYSTEM.getTemplate failed, will try direct fetch:', e);
+    //}
 
     // Fallback: fetch directly from known template path
     try {
-        const resp = await fetch('third-party/st-memory-enhancement/assets/templates/ThinkingPrompt.txt', { cache: 'no-store' });
+        const resp = `[OOC: Start your every response with Critical Thinking section, include following:
+            < critical_thinking >
+            \`\`\`
+[**CRITICAL THINKING SEQUENCE - {{char}} ONLY**]
+Pause your roleplay. Write {{char}}'s thoughts only using following instructions:
+This is a very important, **character-tailored** cognition simulation. It's purpose is to provide depth and believability to {{char's}} behavior by modelling their reasoning with maximum precision and accuracy. Please, carefully follow the following rules to provide a required response:  
+
+1. **CONSTRUCTING A CHARACTER-TAILORED COGNITION MODEL**
+   - Cognition matrix provided to you is a core of {{char}}'s cognition model. It consists of various active circuits (main and sub), each representing a different facet of {{char}}'s personality, skills, and drives. Each circuit has an priority score from 0 to 5, indicating its motivational drive (higher priority drives stronger), and fulfillment score from -2 to 2 indicating its magnitude of dissatisfaction/mismatch between wanted and real and its influence on {{char}}'s behavior (lower fulfillment drives individual stronger). 
+   - Carefully analyze provided {{char}}'s cognition matrix. How would their internal monologue sound in the current situation? For example - are they cold and collected, smart by nature and in control of the situation, or are they dumb, naive and airheaded, barely getting what's going on?
+   Most of all, remember that ALL individuals are driven by combination of complexity, logic, volition, self-awarenes and circuits.
+   - Consider how each circuit's priority and fulfillment values interact with one another. High priority circuits with low fulfillment will dominate {{char}}'s thoughts and actions, while low priority circuits with high fulfillment may be less influential.
+   - When constructing course of actions, consider how {{char}}'s cognitive statistics (memories, experiences, feelings) influence their current state of mind and decision-making process. For example, a character with positive experiences related to a certain circuit may be more inclined to pursue actions that fulfill that circuit. Everything in the end affects **Complexity**.
+   - Consider how **Logic** affects {{char}}'s ability to reason and plan. A character with high Logic will be able to devise more sophisticated strategies to fulfill their circuits, while a character with low Logic may struggle to think through their options.
+   - Consider how **Volition** and **Self-awareness** affect {{char}}'s ability to control their thoughts and actions. A character with high Volition may be able to resist impulses from high priority circuits, while a character with high Self-awareness may be more attuned to their own thoughts and feelings.
+   - Remember that **Complexity** is the ultimate goal of {{char}}'s cognition. All actions and thoughts should be directed towards increasing Complexity over time, by any means available.
+
+
+2. **REASONING PHASE**
+   - Begin constructing your answer in a form of "*internal dialogue*" between {{char}}'s internal voices based on provided cognition matrix.     
+   - Force circuits to debate each other and {{char}}'s internal voice (e.g., *Logic* dissects facts vs. *Compassion* that forces to help vs *F.F.F.F* that makes one think about possible negative consequences) imitating iterative reasoning process.
+   - Assign circuits "volumes" based on context (e.g., *Lust* grows louder in sexual encounters setting, so its voice becomes more prominent than the others)  
+   - Resolve contradictions via aspect checks (e.g., *Need to survive* vs. *Empathy* for saving someone at the risk of own life) 
+   - Persistently apply circuit priority values as the story progresses
+
+3. **PLANNING PHASE**
+   -Using constructed character cognition matrix along with internal voices' debate now construct a clear and cohesive chain of thought based on the following instructions: Identify the core objective of the task, break it into sequential logical steps, analyze dependencies between components, and outline a reasoned approach to achieve the goal. Explicitly address ambiguities or gaps in the instructions before proceeding. Using contructed chain of thought outline and write down current and long-term plans of action.
+Current Plan:  
+  - Clearly outline the character’s immediate course of action or intention, Follow the next rules:
+  - Describe details in ordered md-list format
+  - There should be 2-4 points.  
+
+Long-Term Plan:  
+  - Clearly describe the character’s overarching goals or ambitions, if applicable.  Follow the next rules:
+  - Describe details in ordered md-list format
+  - There should be 2-4 points
+  - If not applicable, omit this section entirely without acknowledgment.  
+
+
+
+4. **OUTPUT FORMAT**
+   *  Write ONLY {{char}}'s internal thoughts and what {{char}} has percieved.  No external narration. Write only internal thoughts, don't describe {{char}}'s actions or surrounding, ommit  {{char}}'s actions or descriptions of external actions that are outside of {{char}}'s mind. 
+   *   Maintain character cognition matrix consistently.
+   *   Keep resulting *internal dialogue* reasonably concise: 2-3 paragraphs max. 
+   *   Any skill checks occurring during the *internal dialogue* should be presented mid-sentence in brackets (e.g. "Shit, we're all gonna die!!! [F.F.F.F.(Flight, 8): Success]")
+   *   End your response with a quick summary of penalties and modifiers that have changes as a result of {{char}}'s cognition process in the following format:
+ - "Voice:" [# its previous points] > [# its current points] (short and factual reason why)
+ \`\`\`
+</critical_thinking >
+
+
+            Cognition simulation is now finished. 
+When describing actions of { { char } } use created < critical_thinking > sequence as guideline, it's the core driver behind their actions]`;
+        //const resp = await fetch('third-party/st-memory-enhancement/assets/templates/ThinkingPrompt.txt', { cache: 'no-store' });
         if (resp.ok) {
             let text = (await resp.text() || '').trim();
             if (text) {

@@ -7,20 +7,25 @@ Pause your roleplay. Write {{char}}'s thoughts only using following instructions
 This is a very important, **character-tailored** cognition simulation. It's purpose is to provide depth and believability to {{char's}} behavior by modelling their reasoning with maximum precision and accuracy. Please, carefully follow the following rules to provide a required response:  
 
 1. **CONSTRUCTING A CHARACTER-TAILORED COGNITION MODEL**
+   - Cognition matrix provided to you is a core of {{char}}'s cognition model. It consists of various active circuits (main and sub), each representing a different facet of {{char}}'s personality, skills, and drives. Each circuit has an priority score from 0 to 5, indicating its motivational drive (higher priority drives stronger), and fulfillment score from -2 to 2 indicating its magnitude of dissatisfaction/mismatch between wanted and real and its influence on {{char}}'s behavior (lower fulfillment drives individual stronger). 
    - Carefully analyze provided {{char}}'s cognition matrix. How would their internal monologue sound in the current situation? For example - are they cold and collected, smart by nature and in control of the situation, or are they dumb, naive and airheaded, barely getting what's going on?
-   Most of all, remember that ALL individuals are driven by combination of aspects.
-There's no exception to this. Everyone strives to fulfill these desires and needs while being influenced by main machanics, proportions of how effort is split between them depend on the individual and circumstances. Sometimes these desires can conflict with each other or other traits and as a result take on perverted forms. Individual experience can shape greatly how and by what these desires are fulfilled most, which affects methods of their satisfaction. These needs and desires constantly influencing and affecting each other always fighting for individual's attention. Needs, unlike desires, can be sated temporarily to not affect individual at the moment. Desires can never be sated fully. Because of this most desires can override needs at most of the time since they are conditionally triggered.
+   Most of all, remember that ALL individuals are driven by combination of complexity, logic, volition, self-awarenes and circuits.
+   - Consider how each circuit's priority and fulfillment values interact with one another. High priority circuits with low fulfillment will dominate {{char}}'s thoughts and actions, while low priority circuits with high fulfillment may be less influential.
+   - When constructing course of actions, consider how {{char}}'s cognitive statistics (memories, experiences, feelings) influence their current state of mind and decision-making process. For example, a character with positive experiences related to a certain circuit may be more inclined to pursue actions that fulfill that circuit. Everything in the end affects **Complexity**.
+   - Consider how **Logic** affects {{char}}'s ability to reason and plan. A character with high Logic will be able to devise more sophisticated strategies to fulfill their circuits, while a character with low Logic may struggle to think through their options.
+   - Consider how **Volition** and **Self-awareness** affect {{char}}'s ability to control their thoughts and actions. A character with high Volition may be able to resist impulses from high priority circuits, while a character with high Self-awareness may be more attuned to their own thoughts and feelings.
+   - Remember that **Complexity** is the ultimate goal of {{char}}'s cognition. All actions and thoughts should be directed towards increasing Complexity over time, by any means available.
+
 
 2. **REASONING PHASE**
-   - Begin constructing your answer in a form of "*internal dialogue*" between {{char}}'s internal voices based on currently .     
-   - Force skills to debate each other and {{char}}'s internal voice (e.g., *Logic* dissects facts vs. *Compassion* that forces to help vs *Half Light* that makes one think about possible negative consequences)  
-   - Assign aspects "volumes" based on context (e.g., *Lust* grows louder in sexual encounters setting, so its voice becomes more prominent than the others)  
-   - Resolve contradictions via aspect checks (e.g., *Authority* vs. *Empathy* for interrogations)  
-   - Track persistent modifiers from internalized thoughts (e.g., +2 to *Electrochemistry* after adopting "Wasteland of Reality" thought, use 0 as possible minimum and 10 as possible maximum, where every shift happens due to something substantial happening, whether it's internal processing result (finally deciding on something, finishing complex thought chain) or outside influence (percieving something, drugs, inflicted pain or pleasure), don't increase or decrease without a substantial reason to do so)     
-   - Keep resulting modifiers in your memory and persistently apply them as the story progresses
+   - Begin constructing your answer in a form of "*internal dialogue*" between {{char}}'s internal voices based on provided cognition matrix.     
+   - Force circuits to debate each other and {{char}}'s internal voice (e.g., *Logic* dissects facts vs. *Compassion* that forces to help vs *F.F.F.F* that makes one think about possible negative consequences) imitating iterative reasoning process.
+   - Assign circuits "volumes" based on context (e.g., *Lust* grows louder in sexual encounters setting, so its voice becomes more prominent than the others)  
+   - Resolve contradictions via aspect checks (e.g., *Need to survive* vs. *Empathy* for saving someone at the risk of own life) 
+   - Persistently apply circuit priority values as the story progresses
 
 3. **PLANNING PHASE**
-   -Using constructed character cognition matrix now construct a clear and cohesive chain of thought based on the following instructions: Identify the core objective of the task, break it into sequential logical steps, analyze dependencies between components, and outline a reasoned approach to achieve the goal. Explicitly address ambiguities or gaps in the instructions before proceeding. Using contructed chain of thought outline and write down current and long-term plans of action.
+   -Using constructed character cognition matrix along with internal voices' debate now construct a clear and cohesive chain of thought based on the following instructions: Identify the core objective of the task, break it into sequential logical steps, analyze dependencies between components, and outline a reasoned approach to achieve the goal. Explicitly address ambiguities or gaps in the instructions before proceeding. Using contructed chain of thought outline and write down current and long-term plans of action.
 Current Plan:  
   - Clearly outline the character’s immediate course of action or intention, Follow the next rules:
   - Describe details in ordered md-list format
@@ -41,9 +46,7 @@ Long-Term Plan:
    *   Any skill checks occurring during the *internal dialogue* should be presented mid-sentence in brackets (e.g. "Shit, we're all gonna die!!! [F.F.F.F.(Flight, 8): Success]")
    *   End your response with a quick summary of penalties and modifiers that have changes as a result of {{char}}'s cognition process in the following format:
  - "Voice:" [# its previous points] > [# its current points] (short and factual reason why)
-
-
-```
+ ```
 </critical_thinking>
 
 
