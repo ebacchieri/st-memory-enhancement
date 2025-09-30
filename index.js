@@ -177,21 +177,22 @@ export function findNextChatWhitTableData(startIndex, isIncludeStartIndex = fals
  * @returns 生成的完整提示词
  */
 export function initTableData(eventData) {
-    const allPrompt = USER.tableBaseSetting.message_template.replace('{{tableData}}', getTablePrompt(eventData))
-    const promptContent = replaceUserTag(allPrompt)  //替换所有的<user>标签
-    console.log("完整提示", promptContent)
-    return promptContent
+    // Use definitions-only (no values) in the injected guide
+    const allPrompt = USER.tableBaseSetting.message_template.replace('{{tableData}}', getTablePrompt(eventData, 'defs'));
+    const promptContent = replaceUserTag(allPrompt);  // 替换所有的<user>标签
+    console.log("完整提示", promptContent);
+    return promptContent;
 }
 
 /**
  * 获取表格相关提示词
  * @returns {string} 表格相关提示词
  */
-export function getTablePrompt(eventData, isPureData = false) {
-    const lastSheetsPiece = BASE.getReferencePiece()
-    if(!lastSheetsPiece) return ''
-    console.log("获取到的参考表格数据", lastSheetsPiece)
-    return getTablePromptByPiece(lastSheetsPiece, isPureData)
+export function getTablePrompt(eventData, mode = false) {
+    const lastSheetsPiece = BASE.getReferencePiece();
+    if (!lastSheetsPiece) return '';
+    console.log("获取到的参考表格数据", lastSheetsPiece);
+    return getTablePromptByPiece(lastSheetsPiece, mode);
 }
 
 /**
@@ -199,15 +200,29 @@ export function getTablePrompt(eventData, isPureData = false) {
  * @param {Object} piece 聊天片段
  * @returns {string} 表格相关提示词
  */
-export function getTablePromptByPiece(piece, isPureData = false) {
-    const {hash_sheets} = piece
+export function getTablePromptByPiece(piece, mode = false) {
+    const { hash_sheets } = piece;
     const sheets = BASE.hashSheetsToSheets(hash_sheets)
         .filter(sheet => sheet.enable)
         .filter(sheet => sheet.sendToContext !== false);
-    console.log("构建提示词时的信息 (已过滤)", hash_sheets, sheets)
-    const customParts = isPureData ? ['title', 'headers', 'rows'] : ['title', 'node', 'headers', 'rows', 'editRules'];
-    const sheetDataPrompt = sheets.map((sheet, index) => sheet.getTableText(index, customParts, piece)).join('\n')
-    return sheetDataPrompt
+    console.log("构建提示词时的信息 (已过滤)", hash_sheets, sheets);
+
+    // mode === true -> legacy "pure data" (headers + rows)
+    // mode === 'defs' -> headers + edit rules only (no rows, no values)
+    // default -> full (title + node + headers + rows + edit rules)
+    let customParts;
+    if (mode === true) {
+        customParts = ['title', 'headers', 'rows'];
+    } else if (mode === 'defs') {
+        customParts = ['headers', 'editRules'];
+    } else {
+        customParts = ['title', 'node', 'headers', 'rows', 'editRules'];
+    }
+
+    const sheetDataPrompt = sheets
+        .map((sheet, index) => sheet.getTableText(index, customParts, piece))
+        .join('\n');
+    return sheetDataPrompt;
 }
 
 /**
