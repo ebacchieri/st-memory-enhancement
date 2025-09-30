@@ -1,5 +1,5 @@
 // Cognition Matrix computation
-import { BASE, EDITOR } from '../../core/manager.js';
+import { BASE, EDITOR, USER } from '../../core/manager.js';
 
 // Influence weights: +1 enhance/contributes; -1 impairs.
 // Derived from assets/CircuitsDefinition.txt, kept internal.
@@ -25,6 +25,30 @@ const CIRCUITS = [
     'Pleasure',
     'Electrochemistry'
 ];
+
+// Descriptions used when auto-seeding missing circuit rows (kept in sync with core/table/sheet.js)
+const CIRCUIT_INFO = new Map([
+    ['Desire to Acquire', 'The drive to accumulate and possess things, whether tangible or intangible.'],
+    ['Desire to Bond', 'The need to be loved and valued in relationships with others.'],
+    ['Desire to Learn', 'The pursuit of knowledge and understanding, driven by curiosity.'],
+    ['Desire to Defend', 'The instinct to protect oneself, loved ones, and property.'],
+    ['Desire to Feel', 'The longing for emotional experiences, both pleasant and exciting.'],
+    ['Need to Survive', 'Self-preservation instinct; contributes to itself and F.F.F.F.; impairs other desires.'],
+    ['Need for Food', 'Hunger; impairs Empathy, Compassion, Desire to Acquire, and Desire to Learn.'],
+    ['Need for Water', 'Thirst; the strongest need; impairs everything else.'],
+    ['Need for Sex (Lust)', 'Second strongest need; enhances Desire to Bond and Desire to Feel.'],
+    ['Empathy', 'Understand and share feelings; enhances Lust.'],
+    ['Compassion', 'Desire to help in response to others’ suffering; enhances Empathy.'],
+    ['Emotional Contagion', 'Automatic tendency to “catch” emotions; enhances Compassion.'],
+    ['Reward and Motivation', 'Drives behavior via anticipated and received pleasure; contributes to itself and all circuits.'],
+    ['F.F.F.F. (Fight)', 'Aggressive response to threat; impairs Empathy and Compassion.'],
+    ['F.F.F.F. (Flight)', 'Escape response; impairs Compassion.'],
+    ['F.F.F.F. (Freeze)', 'Paralysis in face of danger; impairs Empathy.'],
+    ['F.F.F.F. (Fawn)', 'Appeasement response; impairs Desire to Bond and Desire to Feel.'],
+    ['Pain', 'Protective signal; impairs everything else.'],
+    ['Pleasure', 'Positive experience; enhances every desire and need for sex.'],
+    ['Electrochemistry', 'Other neuro-factors/drugs/emotions; can enhance or impair everything.'],
+]);
 
 function idxByName(name) {
     return CIRCUITS.indexOf(name);
@@ -170,7 +194,7 @@ function insertRowAtEnd(sheet, values) {
     });
 }
 
-// NEW: Ensure main stat rows exist; seed defaults if missing
+// Ensure main stat rows exist; seed defaults if missing
 function ensureMainRows(sheet) {
     try {
         const header = sheet.getHeader();
@@ -214,12 +238,39 @@ function ensureMainRows(sheet) {
         }
 
         if (changed) {
-            // Persist immediately to avoid re-triggering seeding on next pass
-            const { piece } = BASE?.USER?.getChatPiece?.() || {};
+            const { piece } = USER.getChatPiece() || {};
             if (piece) sheet.save(piece, true);
         }
     } catch (e) {
         console.warn('[Cognition] ensureMainRows failed:', e);
+    }
+}
+
+// Ensure default circuit rows exist; seed any missing from CIRCUITS with proper description
+function ensureCircuitRows(sheet) {
+    try {
+        const header = sheet.getHeader();
+        const idxName = header.indexOf('Name');
+        if (idxName < 0) return;
+
+        const rows = sheet.getContent(false);
+        const existing = new Set(rows.map(r => String(r[idxName]).trim()).filter(Boolean));
+        const missing = CIRCUITS.filter(n => !existing.has(n));
+        if (missing.length === 0) return;
+
+        let changed = false;
+        missing.forEach(n => {
+            const desc = CIRCUIT_INFO.get(n) || '';
+            // Default seed: priority=1 (Value), Change=0, Modifiers='', Final Change=0, Exclusion=no
+            insertRowAtEnd(sheet, [n, desc, '1', '0', '', '0', 'no']);
+            changed = true;
+        });
+        if (changed) {
+            const { piece } = USER.getChatPiece() || {};
+            if (piece) sheet.save(piece, true);
+        }
+    } catch (e) {
+        console.warn('[Cognition] ensureCircuitRows failed:', e);
     }
 }
 
@@ -240,7 +291,7 @@ export function updateCognitionMatrixAfterEdits(allSheets) {
 
         if ([idxName, idxValue, idxChange, idxMods, idxFinal, idxExcl].some(i => i < 0)) return;
 
-        // NEW: Seed main rows if missing (handles templates with empty cognition sheet)
+        // Seed required rows if missing
         const idxRowComplexity0 = findRowIndexByName(sheet, 'Complexity');
         const idxRowLogic0 = findRowIndexByName(sheet, 'Logic');
         const idxRowSA0 = findRowIndexByName(sheet, 'Self-awareness');
@@ -248,6 +299,7 @@ export function updateCognitionMatrixAfterEdits(allSheets) {
         if (idxRowComplexity0 < 1 || idxRowLogic0 < 1 || idxRowSA0 < 1 || idxRowVolition0 < 1) {
             ensureMainRows(sheet);
         }
+        ensureCircuitRows(sheet);
 
         // Recompute indices after potential seeding
         const idxRowComplexity = findRowIndexByName(sheet, 'Complexity');
@@ -274,6 +326,8 @@ export function updateCognitionMatrixAfterEdits(allSheets) {
         // Collect circuit rows: all rows excluding the 4 main stat rows
         const mainNames = new Set(['Complexity','Logic','Self-awareness','Volition']);
         const circuitRows = [];
+        const rows = sheet.getContent(false);
+        const rowCount = rows.length;
         for (let i = 1; i <= rowCount; i++) {
             const nameCell = getCell(sheet, i, idxName + 1);
             const name = nameCell?.data?.value;
@@ -412,8 +466,7 @@ export function updateCognitionMatrixAfterEdits(allSheets) {
         filtered.push({ name: 'Logic Modifier', value: logicModValue });
         if (complexityModsCell) complexityModsCell.data.value = formatModifiersCell(filtered);
 
-        const finalLogicMod = logicModValue;
-        const finalComplexityDelta = complexityDeltaFromCircuits + (-1) + finalLogicMod;
+        const finalComplexityDelta = complexityDeltaFromCircuits + (-1) + logicModValue;
 
         // Update Complexity Final Change and Value
         const complexityFinalCell = getCell(sheet, complexityRow, idxFinal + 1);
@@ -429,7 +482,8 @@ export function updateCognitionMatrixAfterEdits(allSheets) {
         EDITOR.warning('Cognition Matrix update failed. Check console for details.');
     }
 }
-// NEW: Build a compact prompt snippet with main stats + top-K circuits by priority
+
+// Build a compact prompt snippet with main stats + top-K circuits by priority
 export function buildCognitionTopKPrompt(kOverride = null) {
     try {
         const sheets = BASE.getChatSheets();
@@ -446,7 +500,7 @@ export function buildCognitionTopKPrompt(kOverride = null) {
         const getRowByName = (n) => {
             const rows = sheet.getContent(false);
             const nameIdx = header.indexOf('Name');
-            for (let i = 0; i + 1 < rows.length; i++) {
+            for (let i = 0; i < rows.length; i++) {
                 if (String(rows[i][nameIdx]) === n) return rows[i];
             }
             return null;
@@ -479,7 +533,7 @@ export function buildCognitionTopKPrompt(kOverride = null) {
         parsed.sort((a,b) => (b.priority - a.priority) || a.name.localeCompare(b.name));
         const top = parsed.slice(0, Math.max(0, k));
 
-        const ms = `Cognition Summary\n- Main: Complexity=${main?.Complexity?.value ?? ''} (${main?.Complexity?.finalChange ?? 0 >= 0 ? '+' : ''}${main?.Complexity?.finalChange ?? 0}), Logic=${main?.Logic?.value ?? ''}, Self-awareness=${main?.['Self-awareness']?.value ?? ''}, Volition=${main?.Volition?.value ?? ''}`;
+        const ms = `Cognition Summary\n- Main: Complexity=${main?.Complexity?.value ?? ''} (${(main?.Complexity?.finalChange ?? 0) >= 0 ? '+' : ''}${main?.Complexity?.finalChange ?? 0}), Logic=${main?.Logic?.value ?? ''}, Self-awareness=${main?.['Self-awareness']?.value ?? ''}, Volition=${main?.Volition?.value ?? ''}`;
         const list = top.map((c, i) =>
             `  ${i+1}. ${c.name} | priority=${c.priority} | final=${c.final >= 0 ? '+' : ''}${c.final} | excl=${c.excl ? 'yes' : 'no'}`
         ).join('\n');
