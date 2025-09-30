@@ -418,28 +418,29 @@ export function updateCognitionMatrixAfterEdits(allSheets) {
 
         // Sort circuits by priority desc (stable)
         updatedCircuits.sort((a, b) => (b.newPriority - a.newPriority) || a.name.localeCompare(b.name));
-        // Rebuild sheet rows in sorted order (keep main stats at top in same order)
-        const headerRow = sheet.getHeader();
+
+        // Build new value sheet for rebuild (include Name column)
+        const headerNames = sheet.getHeader(); // ['Name','Description',...]
         const mainRows = ['Complexity','Logic','Self-awareness','Volition'].map(n => {
             const ri = findRowIndexByName(sheet, n);
-            const rowVals = header.map((_, ci) => {
+            const rowVals = headerNames.map((_, ci) => {
                 const cell = getCell(sheet, ri, ci + 1);
                 return cell?.data?.value ?? '';
             });
-            return rowVals.slice(1);
+            return rowVals; // keep Name column
         });
 
         const circuitsSortedValues = updatedCircuits.map(u => {
             const ri = u.rowIdx;
-            const rowVals = header.map((_, ci) => {
+            const rowVals = headerNames.map((_, ci) => {
                 const cell = getCell(sheet, ri, ci + 1);
                 return cell?.data?.value ?? '';
             });
-            return rowVals.slice(1);
+            return rowVals; // keep Name column
         });
 
         const valueSheet = [
-            header,                        // header row (complete)
+            ['', ...headerNames],          // header row with index col
             ['', ...mainRows[0]],         // Complexity
             ['', ...mainRows[1]],         // Logic
             ['', ...mainRows[2]],         // Self-awareness
