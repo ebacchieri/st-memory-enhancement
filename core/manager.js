@@ -30,7 +30,7 @@ export const USER = {
         const chats = USER.getContext().chat
         const lastChat = chats[chats.length - 1];
         const isIncludeEndIndex = (!lastChat) || lastChat.is_user === true;
-        if(isIncludeEndIndex = false)
+        if(isIncludeEndIndex === false)
         {
             const {deep} = USER.getChatPiece()
             return {isSwipe: true, deep}
