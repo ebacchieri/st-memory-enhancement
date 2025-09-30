@@ -615,9 +615,9 @@ export function renderSetting() {
 export function loadSettings() {
     USER.IMPORTANT_USER_PRIVACY_DATA = USER.IMPORTANT_USER_PRIVACY_DATA || {};
 
-    // Check if migration is needed (increment updateIndex to 5)
-    if (USER.tableBaseSetting.updateIndex < 5) {
-        console.log("Triggering migration to new Memory Table format");
+    // UpdateIndex migration: bump to 6 to ensure Cognition Matrix template is created
+    if (USER.tableBaseSetting.updateIndex < 6) {
+        console.log("Triggering migration to new Memory + Cognition Matrix templates");
         
         // Clear any existing problematic data
         if (USER.getContext().chatMetadata?.sheets) {
@@ -626,7 +626,7 @@ export function loadSettings() {
         
         try {
             initTableStructureToTemplate();
-            USER.tableBaseSetting.updateIndex = 5;
+            USER.tableBaseSetting.updateIndex = 6;
             console.log("Migration completed successfully");
         } catch (error) {
             console.error("Migration failed:", error);
@@ -651,10 +651,10 @@ export function initTableStructureToTemplate() {
         USER.getSettings().table_selected_sheets = []
         USER.getSettings().table_database_templates = [];
         
-        // If no old structure exists, create the new default Memory Table template
+        // If no old structure exists, create the new default templates (Memory + Cognition)
         if (sheetDefaultTemplates.length === 0) {
-            console.log("No existing table structure found, creating default Memory Table template");
-            createDefaultMemoryTableTemplate();
+            console.log("No existing table structure found, creating default Memory + Cognition Matrix templates");
+            createDefaultTemplates();
             USER.saveSettings();
             return;
         }
@@ -669,31 +669,43 @@ export function initTableStructureToTemplate() {
         if (existingMemoryTable) {
             console.log("Memory Table template already exists, using existing structure");
             processExistingTemplate(existingMemoryTable);
+
+            // Ensure Cognition Matrix is also present (create if missing)
+            const existingCognition = sheetDefaultTemplates.find(t => t.tableName === "Cognition Matrix");
+            if (existingCognition) {
+                processExistingTemplate(existingCognition);
+            } else {
+                console.log("Cognition Matrix template not found in structure -> creating default Cognition Matrix template");
+                createDefaultCognitionMatrixTemplate();
+            }
+
             USER.saveSettings();
             return;
         }
         
-        // Migrate from old Chinese structure to new English structure
-        console.log("Migrating from old table structure to new Memory Table format");
-        
-        // Instead of migrating multiple tables, create a single Memory Table
-        createDefaultMemoryTableTemplate();
-        
-        // Optionally preserve old data by merging it (you can customize this logic)
-        // migrateOldTableData(sheetDefaultTemplates);
-        
+        // Migrate from old structure -> create both new templates
+        console.log("Migrating to Memory + Cognition Matrix templates");
+        createDefaultTemplates();
         USER.saveSettings();
         
     } catch (error) {
-        console.error("Migration failed, creating default Memory Table:", error);
+        console.error("Migration failed, creating default templates:", error);
         try {
-            createDefaultMemoryTableTemplate();
+            createDefaultTemplates();
             USER.saveSettings();
         } catch (fallbackError) {
-            console.error("Failed to create default template:", fallbackError);
+            console.error("Failed to create default templates:", fallbackError);
             EDITOR.error("Failed to initialize table templates. Please check your settings.", fallbackError.message, fallbackError);
         }
     }
+}
+
+function createDefaultTemplates() {
+    const mem = createDefaultMemoryTableTemplate();
+    const cog = createDefaultCognitionMatrixTemplate();
+    USER.getSettings().table_selected_sheets.push(mem.uid, cog.uid);
+    mem.save(); cog.save();
+    console.log("Created default templates:", mem, cog);
 }
 
 function createDefaultMemoryTableTemplate() {
@@ -727,6 +739,41 @@ function createDefaultMemoryTableTemplate() {
     newTemplate.save();
     
     console.log("Created default Memory Table template:", newTemplate);
+    return newTemplate;
+}
+
+// NEW: Create default Cognition Matrix template (global)
+function createDefaultCognitionMatrixTemplate() {
+    const t = new BASE.SheetTemplate();
+    t.domain = 'global';
+    t.createNewTemplate(8, 1, false); // 7 columns + header
+    t.name = 'Cognition Matrix';
+
+    const header = t.getCellsByRowIndex(0);
+    header[1].data.value = 'Name';
+    header[2].data.value = 'Description';
+    header[3].data.value = 'Value';
+    header[4].data.value = 'Change';
+    header[5].data.value = 'Modifiers';
+    header[6].data.value = 'Final Change';
+    header[7].data.value = 'Volition Exclusion';
+
+    t.enable = true;
+    t.tochat = false;
+    t.required = true;
+    t.triggerSend = false;
+    t.triggerSendDeep = 1;
+
+    t.source.data.note = 'Main stats and cognitive circuits with priorities and per-turn fulfillment. Value=overall (main)/priority (sub); Change=base (sub only); Modifiers=long-term; Final Change=system computed; Volition Exclusion=yes/no';
+    t.source.data.initNode = 'Initialize baseline values and circuit rows on first run.';
+    t.source.data.insertNode = 'Insert only when introducing new circuit subtype or persistent long-term modifier category.';
+    t.source.data.updateNode = 'Update Change/Modifiers/Volition Exclusion for circuits; update main stat Value for Logic/Volition/Self-awareness if a one-time change occurs.';
+    t.source.data.deleteNode = 'Delete rows only if circuits subtypes are deprecated.';
+
+    USER.getSettings().table_selected_sheets.push(t.uid);
+    t.save();
+    console.log("Created default Cognition Matrix template:", t);
+    return t;
 }
 
 function processExistingTemplate(template) {

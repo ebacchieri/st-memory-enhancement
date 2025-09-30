@@ -14,6 +14,7 @@ import {executeTranslation} from "./services/translate.js";
 import applicationFunctionManager from "./services/appFuncManager.js"
 import {SheetBase} from "./core/table/base.js";
 import { Cell } from "./core/table/cell.js";
+import { updateCognitionMatrixAfterEdits, buildCognitionTopKPrompt } from "./scripts/runtime/cognitionMatrix.js"; // NEW
 
 
 console.log("______________________记忆插件：开始加载______________________")
@@ -304,13 +305,16 @@ export function parseTableEditTag(piece, mesIndex = -1, ignoreCheck = false) {
     tableEditActions.forEach((action, index) => tableEditActions[index].action = classifyParams(formatParams(action.param)))
     console.log("解析到的表格编辑指令", tableEditActions)
 
-    // 获取上一个表格数据
     const { piece: prePiece } = mesIndex === -1 ? BASE.getLastSheetsPiece(1) : BASE.getLastSheetsPiece(mesIndex - 1, 1000, false)
     const sheets = BASE.hashSheetsToSheets(prePiece.hash_sheets).filter(sheet => sheet.enable)
     console.log("执行指令时的信息", sheets)
     for (const EditAction of sortActions(tableEditActions)) {
         executeAction(EditAction, sheets)
     }
+
+    // NEW: Apply Cognition Matrix calculations before saving
+    try { updateCognitionMatrixAfterEdits(sheets); } catch(e){ console.warn('Cognition update skipped:', e); }
+
     sheets.forEach(sheet => sheet.save(piece, true))
     console.log("聊天模板：", BASE.sheetsData.context)
     console.log("获取到的表格数据", prePiece)
@@ -318,16 +322,12 @@ export function parseTableEditTag(piece, mesIndex = -1, ignoreCheck = false) {
     return true
 }
 
-/**
- * 直接通过编辑指令字符串执行操作
- * @param {string[]} matches 编辑指令字符串
- */
+// Also integrate into direct executor
 export function executeTableEditActions(matches, referencePiece) {
     const tableEditActions = handleTableEditTag(matches)
     tableEditActions.forEach((action, index) => tableEditActions[index].action = classifyParams(formatParams(action.param)))
     console.log("解析到的表格编辑指令", tableEditActions)
 
-    // 核心修复：不再信任传入的 referencePiece.hash_sheets，而是直接从 BASE 获取当前激活的、唯一的 Sheet 实例。
     const sheets = BASE.getChatSheets().filter(sheet => sheet.enable)
     if (!sheets || sheets.length === 0) {
         console.error("executeTableEditActions: 未找到任何启用的表格实例，操作中止。");
@@ -338,8 +338,10 @@ export function executeTableEditActions(matches, referencePiece) {
     for (const EditAction of sortActions(tableEditActions)) {
         executeAction(EditAction, sheets)
     }
-    
-    // 核心修复：确保修改被保存到当前最新的聊天片段中。
+
+    // NEW: Apply Cognition Matrix calculations before saving
+    try { updateCognitionMatrixAfterEdits(sheets); } catch(e){ console.warn('Cognition update skipped:', e); }
+
     const { piece: currentPiece } = USER.getChatPiece();
     if (!currentPiece) {
         console.error("executeTableEditActions: 无法获取当前聊天片段，保存操作失败。");
@@ -349,7 +351,7 @@ export function executeTableEditActions(matches, referencePiece) {
 
     console.log("聊天模板：", BASE.sheetsData.context)
     console.log("测试总chat", USER.getContext().chat)
-    return true // 返回 true 表示成功
+    return true
 }
 
 /**
@@ -541,25 +543,27 @@ function getMesRole() {
  */
 async function onChatCompletionPromptReady(eventData) {
     try {
-        // 优先处理分步填表模式
+        // Step-by-step
         if (USER.tableBaseSetting.step_by_step === true) {
-            // 仅当插件和AI读表功能开启,注入模式不是关闭注入时才注入
             if (USER.tableBaseSetting.isExtensionAble === true && USER.tableBaseSetting.isAiReadTable === true && USER.tableBaseSetting.injection_mode !== "injection_off") {
-                const tableData = getTablePrompt(eventData, true); // 获取纯净数据
-                if (tableData) { // 确保有内容可注入
-                    const finalPrompt = `以下是通过表格记录的当前场景信息以及历史记录信息，你需要以此为参考进行思考：\n${tableData}`;
-                    if (USER.tableBaseSetting.deep === 0) {
-                        eventData.chat.push({ role: getMesRole(), content: finalPrompt });
-                    } else {
-                        eventData.chat.splice(-USER.tableBaseSetting.deep, 0, { role: getMesRole(), content: finalPrompt });
-                    }
-                    console.log("分步填表模式：注入只读表格数据", eventData.chat);
+                // Pure table data
+                const tableData = getTablePrompt(eventData, true);
+                // Prepend processed cognition summary
+                const cogSnippet = buildCognitionTopKPrompt();
+                // Append thinking prompt after table
+                const thinking = await getThinkingPromptText();
+                const finalPrompt = [cogSnippet, tableData, thinking].filter(Boolean).join('\n');
+
+                if (USER.tableBaseSetting.deep === 0) {
+                    eventData.chat.push({ role: getMesRole(), content: finalPrompt });
+                } else {
+                    eventData.chat.splice(-USER.tableBaseSetting.deep, 0, { role: getMesRole(), content: finalPrompt });
                 }
             }
-            return; // 处理完分步模式后直接退出，不执行后续的常规注入
+            return;
         }
 
-        // 常规模式的注入逻辑
+        // Regular mode checks
         if (eventData.dryRun === true ||
             USER.tableBaseSetting.isExtensionAble === false ||
             USER.tableBaseSetting.isAiReadTable === false ||
@@ -567,12 +571,18 @@ async function onChatCompletionPromptReady(eventData) {
             return;
         }
 
-        console.log("生成提示词前", USER.getContext().chat)
-        const promptContent = initTableData(eventData)
+        // Original composed table prompt (with notes/edit rules)
+        const promptContent = initTableData(eventData);
+        // Prepend processed cognition summary
+        const cogSnippet = buildCognitionTopKPrompt();
+        // Append thinking prompt after table
+        const thinking = await getThinkingPromptText();
+        const merged = [cogSnippet, promptContent, thinking].filter(Boolean).join('\n');
+
         if (USER.tableBaseSetting.deep === 0)
-            eventData.chat.push({ role: getMesRole(), content: promptContent })
+            eventData.chat.push({ role: getMesRole(), content: merged })
         else
-            eventData.chat.splice(-USER.tableBaseSetting.deep, 0, { role: getMesRole(), content: promptContent })
+            eventData.chat.splice(-USER.tableBaseSetting.deep, 0, { role: getMesRole(), content: merged })
 
         updateSheetsView()
     } catch (error) {

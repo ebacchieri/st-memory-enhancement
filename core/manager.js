@@ -1,6 +1,5 @@
 import { TTable } from "./tTableManager.js";
 import applicationFunctionManager from "../services/appFuncManager.js";
-// 移除旧表格系统引用
 import { consoleMessageToEditor } from "../scripts/settings/devConsole.js";
 import { calculateStringHash, generateRandomNumber, generateRandomString, lazy, readonly, } from "../utils/utility.js";
 import { defaultSettings } from "../data/pluginSetting.js";
@@ -20,12 +19,6 @@ import {updateSelectBySheetStatus} from "../scripts/editor/tableTemplateEditView
 let derivedData = {}
 
 export const APP = applicationFunctionManager
-
-/**
- * @description `USER` 用户数据管理器
- * @description 该管理器用于管理用户的设置、上下文、聊天记录等数据
- * @description 请注意，用户数据应该通过该管理器提供的方法进行访问，而不应该直接访问用户数据
- */
 export const USER = {
     getSettings: () => APP.power_user,
     getExtensionSettings: () => APP.extension_settings,
@@ -37,9 +30,12 @@ export const USER = {
         const chats = USER.getContext().chat
         const lastChat = chats[chats.length - 1];
         const isIncludeEndIndex = (!lastChat) || lastChat.is_user === true;
-        if(isIncludeEndIndex) return {isSwipe: false}
-        const {deep} = USER.getChatPiece()
-        return {isSwipe: true, deep}
+        if(isIncludeEndIndex = false)
+        {
+            const {deep} = USER.getChatPiece()
+            return {isSwipe: true, deep}
+        }
+        return {isSwipe: false}
     },
     getChatPiece: (deep = 0, direction = 'up') => {
         const chat = APP.getContext().chat;
@@ -48,7 +44,7 @@ export const USER = {
         while (chat[index].is_user === true) {
             if(direction === 'up')index--
             else index++
-            if (!chat[index]) return {piece: null, deep: -1}; // 如果没有找到非用户消息，则返回null
+            if (!chat[index]) return {piece: null, deep: -1};
         }
         return {piece:chat[index], deep: index};
     },
@@ -67,18 +63,7 @@ export const USER = {
     IMPORTANT_USER_PRIVACY_DATA: createProxyWithUserSetting('IMPORTANT_USER_PRIVACY_DATA', true),
 }
 
-
-/**
- * @description `BASE` 数据库基础数据管理器
- * @description 该管理器提供了对库的用户数据、模板数据的访问，但不提供对数据的修改
- * @description 请注意，对库的操作应通过 `BASE.object()` 创建 `Sheet` 实例进行，任何对库的编辑都不应该直接暴露到该管理器中
- */
 export const BASE = {
-    /**
-     * @description `Sheet` 数据表单实例
-     * @description 该实例用于对数据库的数据进行访问、修改、查询等操作
-     * @description 请注意，对数据库的任何操作都应该通过该实例进行，而不应该直接访问数据库
-     */
     Sheet: TTable.Sheet,
     SheetTemplate: TTable.Template,
     refreshContextView: refreshContextView,
@@ -128,13 +113,13 @@ export const BASE = {
     getChatSheets(process=() => {}) {
         DERIVED.any.chatSheetMap = DERIVED.any.chatSheetMap || {}
         const sheets = []
-        
+
         // Ensure BASE.sheetsData.context exists
         if (!BASE.sheetsData.context || BASE.sheetsData.context.length === 0) {
             console.log("No chat sheets found, attempting to create default from templates");
             BASE.initHashSheet(); // This will create default tables from templates
         }
-        
+
         BASE.sheetsData.context.forEach(sheet => {
             try {
                 if (!DERIVED.any.chatSheetMap[sheet.uid]) {
@@ -145,19 +130,18 @@ export const BASE = {
                 sheets.push(DERIVED.any.chatSheetMap[sheet.uid])
             } catch (error) {
                 console.error(`Failed to load sheet with UID ${sheet.uid}:`, error);
-                // Continue with other sheets instead of failing completely
-                EDITOR.warning(`Failed to load table: ${sheet.uid}. Creating default table instead.`);
-                
+                // Fallback: create Memory + Cognition default sheets
                 try {
-                    // Create a default sheet as fallback
-                    const defaultSheet = new BASE.Sheet();
-                    defaultSheet.createDefaultMemoryTable();
-                    defaultSheet.save();
-                    DERIVED.any.chatSheetMap[defaultSheet.uid] = defaultSheet;
-                    process(defaultSheet);
-                    sheets.push(defaultSheet);
+                    const memory = new BASE.Sheet(); memory.createDefaultMemoryTable();
+                    const cognition = new BASE.Sheet(); cognition.createDefaultCognitionMatrixTable();
+                    memory.save(undefined, true);
+                    cognition.save(undefined, true);
+                    DERIVED.any.chatSheetMap[memory.uid] = memory;
+                    DERIVED.any.chatSheetMap[cognition.uid] = cognition;
+                    process(memory); process(cognition);
+                    sheets.push(memory, cognition);
                 } catch (fallbackError) {
-                    console.error('Failed to create fallback sheet:', fallbackError);
+                    console.error('Failed to create fallback sheets:', fallbackError);
                 }
             }
         })
@@ -237,9 +221,6 @@ export const BASE = {
         BASE.refreshTempView(true)
         USER.saveChat()
     },
-    updateSelectBySheetStatus(){
-        updateSelectBySheetStatus()
-    },
     getLastSheetsPiece(deep = 0, cutoff = 1000, deepStartAtLastest = true, direction = 'up') {
         console.log("向上查询表格数据，深度", deep, "截断", cutoff, "从最新开始", deepStartAtLastest)
         // 如果没有找到新系统的表格数据，则尝试查找旧系统的表格数据（兼容模式）
@@ -301,16 +282,19 @@ export const BASE = {
                     return currentPiece
                 }
             } catch (templateError) {
-                console.warn('从模板构建失败，创建默认的记忆表格:', templateError);
+                console.warn('从模板构建失败，将创建默认的 Memory + Cognition 表格:', templateError);
             }
             
-            // Fallback: create a single default Memory Table
+            // Fallback: create both default tables
             try {
-                const defaultSheet = BASE.createChatSheet(5, 1); // 4 columns + header
-                defaultSheet.createDefaultMemoryTable();
+                const memory = BASE.createChatSheet(5, 1); // 4 columns + header
+                memory.createDefaultMemoryTable();
+                const cognition = BASE.createChatSheet(8, 1);
+                cognition.createDefaultCognitionMatrixTable();
                 
                 const hash_sheets = {}
-                hash_sheets[defaultSheet.uid] = defaultSheet.hashSheet.map(row => row.map(hash => hash));
+                hash_sheets[memory.uid] = memory.hashSheet.map(row => row.map(hash => hash));
+                hash_sheets[cognition.uid] = cognition.hashSheet.map(row => row.map(hash => hash));
                 
                 if (currentPiece) {
                     currentPiece.hash_sheets = hash_sheets;
@@ -319,7 +303,7 @@ export const BASE = {
                     return { hash_sheets };
                 }
             } catch (defaultError) {
-                console.error('创建默认记忆表格失败:', defaultError);
+                console.error('创建默认表格失败:', defaultError);
                 // Return minimal structure to prevent further errors
                 return { hash_sheets: {} };
             }
@@ -334,7 +318,7 @@ export const BASE = {
     getTableSpecificRules(tableName) {
         switch(tableName) {
             case "Memory Table":
-            case "Spacetime Table": 
+            case "Spacetime Table":
                 return "retain only the latest row when multiple exist";
             case "Character Features Table":
                 return "merge duplicate character entries";

@@ -38,7 +38,7 @@ export const profile_prompts = await switchLanguage('__profile_prompts__', {
 
     "Supplement": {
       "NewRowRules": {
-        "TriggerCondition": "existence of unrecorded valid events",
+        "TriggerCondition": "existence of unrecorded valid events in Memory Table",
         "InsertionLimitation": "batch insertion permitted"
       },
       "CellCompletionRules": {
@@ -64,20 +64,7 @@ export const profile_prompts = await switchLanguage('__profile_prompts__', {
         }
       },
       "ContentCheck": {
-        "General Rule": {
-            "Processing Steps": [
-                "1. Split cell content by '/' into individual elements",
-                "2. For each element:",
-                "   a. Check against current column's exclusion list",
-                "   b. If element contains excluded attributes:",
-                "      i. Identify target column in same row that allows this attribute",
-                "      ii. Move element to identified target column",
-                "      iii. Remove from original column",
-                "3. Rejoin elements with '/' in both original and target columns"
-            ],
-            "Validation Criteria": "All elements should strictly match the permitted attributes defined in their column"
-        },
-        "Column Rules": {
+        "Column Rules (Memory Table)": {
             "Place": {"Purpose": "Location information only"},
             "Characters": {"Purpose": "Character names and basic identifiers only"},
             "Keys": {"Purpose": "Keywords that define the content"},
@@ -94,13 +81,37 @@ export const profile_prompts = await switchLanguage('__profile_prompts__', {
       "GlobalCleanupRules": {
         "DuplicateDataPurge": "remove fully identical rows"
       }
+    },
+
+    "CognitionMatrixRules": {
+      "Structure": {
+        "TableIndex": 1,
+        "Columns": ["Name","Description","Value","Change","Modifiers","Final Change","Volition Exclusion"]
+      },
+      "MainStats": {
+        "Allowed": ["update Value for Logic/Self-awareness/Volition if explicitly stated (one-time change)"],
+        "Forbidden": ["modify Complexity Modifiers","modify Final Change"]
+      },
+      "Circuits": {
+        "Allowed": [
+          "update Change with base integer for this turn",
+          "append volition delta using ' ; v:+N' or ' ; v:-N' in Change",
+          "update Modifiers as 'name:value/name2:value2'",
+          "set Volition Exclusion to 'yes' or 'no'"
+        ],
+        "Forbidden": [
+          "modify Final Change",
+          "reorder rows",
+          "perform any formula computation (system will compute influences and complexity)"
+        ]
+      }
     }
   }
 }
 
-Reply format example. Once again, reply directly in the following format without thinking process, explanations, or extra content:
+Reply format example. Return only <New Table> content:
 <New Table>
-[{"tableName":"Memory Table","tableIndex":0,"columns":["Place","Characters","Keys","Content"],"content":[["Library","Alice/Bob","study/research","Alice and Bob are collaborating on their final research project, discussing methodology and sharing academic resources in the university library"]]}]
+[{"tableName":"Memory Table","tableIndex":0,"columns":["Place","Characters","Keys","Content"],"content":[["Library","Alice/Bob","study/research","Alice and Bob are collaborating on their final research project, discussing methodology and sharing resources"]]}]
 </New Table>`
     },
 
@@ -141,12 +152,8 @@ Reply format example. Once again, reply directly in the following format without
 
     "Supplement": {
       "NewRowRules": {
-        "TriggerCondition": "existence of unrecorded valid events",
+        "TriggerCondition": "existence of unrecorded valid events in Memory Table",
         "InsertionLimitation": "batch insertion permitted"
-      },
-      "CellCompletionRules": {
-        "InformationSourceRestriction": "explicitly mentioned in chat logs only",
-        "NullValueHandling": "prohibit speculative content"
       }
     },
 
@@ -167,42 +174,45 @@ Reply format example. Once again, reply directly in the following format without
         }
       },
       "ContentCheck": {
-        "General Rule": {
-            "Processing Steps": [
-                "1. Split cell content by '/' into individual elements",
-                "2. For each element:",
-                "   a. Check against current column's exclusion list",
-                "   b. If element contains excluded attributes:",
-                "      i. Identify target column in same row that allows this attribute",
-                "      ii. Move element to identified target column",
-                "      iii. Remove from original column",
-                "3. Rejoin elements with '/' in both original and target columns"
-            ],
-            "Validation Criteria": "All elements should strictly match the permitted attributes defined in their column"
-        },
-        "Column Rules": {
+        "Column Rules (Memory Table)": {
             "Place": {"Purpose": "Location information only"},
             "Characters": {"Purpose": "Character names and basic identifiers only"},
             "Keys": {"Purpose": "Keywords that define the content"},
             "Content": {"Purpose": "What happened in the context of the message received from LLM"}
         }
       },
-      "ContentUnificationRules": {
-        "FormatInheritanceStrategy": {
-          "TimeFormat": "inherit dominant format from existing table",
-          "LocationFormat": "maintain existing hierarchical structure",
-          "NumericalFormat": "preserve current measurement scale"
-        }
-      },
       "GlobalCleanupRules": {
         "DuplicateDataPurge": "remove fully identical rows"
+      }
+    },
+
+    "CognitionMatrixRules": {
+      "Structure": {
+        "TableIndex": 1,
+        "Columns": ["Name","Description","Value","Change","Modifiers","Final Change","Volition Exclusion"]
+      },
+      "MainStats": {
+        "Allowed": ["update Value for Logic/Self-awareness/Volition if explicitly stated (one-time change)"],
+        "Forbidden": ["modify Complexity Modifiers","modify Final Change"]
+      },
+      "Circuits": {
+        "Allowed": [
+          "update Change with base integer for this turn",
+          "append volition delta using ' ; v:+N' or ' ; v:-N' in Change",
+          "update Modifiers as 'name:value/name2:value2'",
+          "set Volition Exclusion to 'yes' or 'no'"
+        ],
+        "Forbidden": [
+          "modify Final Change",
+          "reorder rows",
+          "perform any formula computation (system will compute influences and complexity)"
+        ]
       }
     }
   }
 }`
     },
 
-    // Add other rebuild templates with similar English translations...
     "rebuild_fix_all": {
         "type": "rebuild",
         "name": "Fix Table (Fix various errors. No new content generated.)",
@@ -240,11 +250,21 @@ Reply format example. Once again, reply directly in the following format without
     "ContentChecks": {
       "ColumnValidation": {
         "Target": "Verify data matches column categories",
-        "Column Rules": {
+        "Column Rules (Memory Table)": {
             "Place": {"Purpose": "Location information only"},
             "Characters": {"Purpose": "Character names and basic identifiers only"},  
             "Keys": {"Purpose": "Keywords that define the content"},
             "Content": {"Purpose": "What happened in the context of the message received from LLM"}
+        },
+        "CognitionMatrixConstraints": {
+            "TableIndex": 1,
+            "ForbiddenEdits": ["Final Change column", "Complexity Modifiers"],
+            "AllowedEdits": [
+                "Change column (circuits base change; may include ' ; v:+N' or ' ; v:-N')",
+                "Modifiers column as 'name:value/name2:value2'",
+                "Volition Exclusion yes/no",
+                "Main stats: Value for Logic/Self-awareness/Volition if explicitly needed"
+            ]
         }
       },
       "ConflictResolution": {
