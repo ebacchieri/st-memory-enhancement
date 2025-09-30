@@ -157,6 +157,72 @@ function getCell(sheet, rowIdx, colIdx) {
 
 function clamp(n, min, max) { return Math.max(min, Math.min(max, n)); }
 
+function insertRowAtEnd(sheet, values) {
+    // values are in display order: [Name, Description, Value, Change, Modifiers, Final Change, Volition Exclusion]
+    const cell0 = sheet.findCellByPosition(sheet.getRowCount() - 1, 0);
+    if (!cell0) return;
+    cell0.newAction(sheet.constructor.Cell?.CellAction?.insertDownRow ?? sheet.cells.get(sheet.hashSheet[0][0]).constructor.CellAction.insertDownRow, {}, false);
+    const rowIdx = sheet.getRowCount() - 1;
+    const ordered = ['', ...values];
+    ordered.forEach((v, i) => {
+        const c = sheet.findCellByPosition(rowIdx, i);
+        if (c) c.data.value = v;
+    });
+}
+
+// NEW: Ensure main stat rows exist; seed defaults if missing
+function ensureMainRows(sheet) {
+    try {
+        const header = sheet.getHeader();
+        const idxName = header.indexOf('Name');
+        if (idxName < 0) return;
+
+        const need = (n) => findRowIndexByName(sheet, n) < 1;
+        let changed = false;
+
+        if (need('Complexity')) {
+            insertRowAtEnd(sheet, [
+                'Complexity',
+                'Overall state of mind; improves above 80, critical below 15. Base temporal decay -1 each turn. Affected by circuits fulfillment and Logic.',
+                '50', '', 'Base Decay:-1/Logic Modifier:0', '0', 'no'
+            ]);
+            changed = true;
+        }
+        if (need('Logic')) {
+            insertRowAtEnd(sheet, [
+                'Logic',
+                'Ability to create proper actions. Levels 0..5+. Each level below 2: Complexity -2; above 2: Complexity +2.',
+                '2', '', '', '', 'no'
+            ]);
+            changed = true;
+        }
+        if (need('Self-awareness')) {
+            insertRowAtEnd(sheet, [
+                'Self-awareness',
+                'Defines how many circuits can be affected by Volition. Levels 0..5+; default 2.',
+                '2', '', '', '', 'no'
+            ]);
+            changed = true;
+        }
+        if (need('Volition')) {
+            insertRowAtEnd(sheet, [
+                'Volition',
+                'Ability to resist/suppress a circuit or enforce change. Levels 0..5+; default 2.',
+                '2', '', '', '', 'no'
+            ]);
+            changed = true;
+        }
+
+        if (changed) {
+            // Persist immediately to avoid re-triggering seeding on next pass
+            const { piece } = BASE?.USER?.getChatPiece?.() || {};
+            if (piece) sheet.save(piece, true);
+        }
+    } catch (e) {
+        console.warn('[Cognition] ensureMainRows failed:', e);
+    }
+}
+
 // Main computation entry
 export function updateCognitionMatrixAfterEdits(allSheets) {
     try {
@@ -174,12 +240,17 @@ export function updateCognitionMatrixAfterEdits(allSheets) {
 
         if ([idxName, idxValue, idxChange, idxMods, idxFinal, idxExcl].some(i => i < 0)) return;
 
-        // Gather row snapshots
-        const rows = sheet.getContent(false); // data rows only (no header)
-        const rowCount = rows.length;
+        // NEW: Seed main rows if missing (handles templates with empty cognition sheet)
+        const idxRowComplexity0 = findRowIndexByName(sheet, 'Complexity');
+        const idxRowLogic0 = findRowIndexByName(sheet, 'Logic');
+        const idxRowSA0 = findRowIndexByName(sheet, 'Self-awareness');
+        const idxRowVolition0 = findRowIndexByName(sheet, 'Volition');
+        if (idxRowComplexity0 < 1 || idxRowLogic0 < 1 || idxRowSA0 < 1 || idxRowVolition0 < 1) {
+            ensureMainRows(sheet);
+        }
 
-        // Main stats
-        const idxRowComplexity = findRowIndexByName(sheet, 'Complexity'); // with header offset
+        // Recompute indices after potential seeding
+        const idxRowComplexity = findRowIndexByName(sheet, 'Complexity');
         const idxRowLogic = findRowIndexByName(sheet, 'Logic');
         const idxRowSA = findRowIndexByName(sheet, 'Self-awareness');
         const idxRowVolition = findRowIndexByName(sheet, 'Volition');
@@ -375,7 +446,7 @@ export function buildCognitionTopKPrompt(kOverride = null) {
         const getRowByName = (n) => {
             const rows = sheet.getContent(false);
             const nameIdx = header.indexOf('Name');
-            for (let i = 0; i < rows.length; i++) {
+            for (let i = 0; i + 1 < rows.length; i++) {
                 if (String(rows[i][nameIdx]) === n) return rows[i];
             }
             return null;
