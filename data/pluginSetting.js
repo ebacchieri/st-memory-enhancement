@@ -178,36 +178,35 @@ insertRow(0, {"0":"Library","1":"Alice/Bob","2":"study/research","3":"Alice and 
 </tableEdit>
 
 ## Cognition Matrix Structure ([1:Cognition Matrix])
-Columns:
-- 0 Name
-- 1 Description
-- 2 Value (main stats: overall; circuits: priority 0..10)
-- 3 Change (sub stats base change for this turn; you may append " ; v:+N" or " ; v:-N" for Volition this-turn delta)
-- 4 Modifiers (long-term modifiers list "name:value/name2:value2")
-- 5 Final Change (system-computed; do not modify)
-- 6 Volition Exclusion (yes/no; yes = exclude this circuit this turn)
+Data format:
+- Circuit index (cIndex), given by table guide (main stats or circuit name)
+- 2 Main Value (mValue) (main stats only; one-time change for Logic, Volition, Self-awareness. Rarely done.)
+- 3 Change value (cValue) (sub stats base change for this turn")
+- 4 Modifiers (mods) (long-term modifiers list "name:value/name2:value2")
+- 6 Volition Exclusion (vExclusion) (yes/no; yes = exclude this circuit this turn)
 
+After generating content, analyze what just happened and how it affects cognition. You have to convert what/'s happened into numbers using stated Rules and Principles FOR EACH AFFECTED SECONDARY CIRCUIT (witn indexes below 4, use table guide for reference) and sometimes main circuits. Which circuits are affected is defined by exact actions/thoughts/events. Then Use <tableEdit> with:
+    updateRow(1, cIndex, {"3":cValue,"4":mods,"6":vExclusion})
 Rules:
 - Main stats:
-  - Update Value only for one-time changes to Logic, Volition, Self-awareness if explicitly stated.
-  - Do not modify Complexity Modifiers or Final Change; system updates Complexity using base decay and logic bonus.
-- Circuits (sub stats):
-  - Write base Change for this turn (e.g., "-1" or "2; v:+1").
-  - Write long-term Modifiers as "name:value/name2:value2".
-  - Set Volition Exclusion to "yes" to exclude processing this turn, else "no".
-  - Do not compute or edit Final Change. Do not sort rows; system does it.
+  - Update mValue only for one-turn changes to Logic, Volition, Self-awareness if explicitly stated.  
+- Main updates happen over Circuits (sub stats):
+  - Write base Change for this turn for particular circuit (e.g., "-1" or "2"). Base change is fulfillment, value of dissatisfaction with current state of satisfying impulse.
+  It is how strong its influence on mind is and its priority changes. Fulfilling acquired from: thinking about it - 0, in case of strong emotions/thoughts that demotivate individual to fulfill circuit it can give 1 or 2, doing something - depends on the solution being executed (can be 1 or 2), ignoring - gives -1,feeling strong emotions/thoughts that motivate towards circuit fulfillment - gives -2 or -3, actively sabotaging it/doing opposite - gives -2 or -3, depending on exact actions).  
+  - Write long-term Modifiers as "name:value/name2:value2". Long-term mods are based on individual 's traits, habits, and environment.
+  - Set Volition Exclusion to "yes" to exclude processing this turn, else "no". Indicate Volition exclusion to things individual can't/doesn't want to/mustn't currently do.  
 
 Examples:
 <tableEdit>
 <!--
-updateRow(1, 10, {"3":"-1; v:+1","4":"fatigue:-1/coffee:+1","6":"no"})
+updateRow(1, 10, {"3":"-1","4":"fatigue:-1/coffee:+1","6":"no"})
 updateRow(1, 2, {"2":"3"})  // example: raise Logic to 3 (one-time change)
 -->
 </tableEdit>
 
 # Important Operation Principles (Must Follow)
 - When <user> requests table modifications, their requirements have the highest priority.
-- Perform appropriate insert/update/delete based on context. Do not fabricate unknowns.
+- Perform appropriate insert/update based on context. Do not fabricate unknowns.
 - Keys in data objects must be string indices: "0","1","2",...
 - Use "/" as a semantic delimiter within a cell; preserve natural spaces.
 - Use <!-- --> comments inside <tableEdit> tags.

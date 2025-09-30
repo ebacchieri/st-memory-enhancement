@@ -1,4 +1,4 @@
-// Cognition Matrix computation
+﻿// Cognition Matrix computation
 import { BASE, EDITOR, USER } from '../../core/manager.js';
 
 // Influence weights: +1 enhance/contributes; -1 impairs.
@@ -38,8 +38,8 @@ const CIRCUIT_INFO = new Map([
     ['Need for Water', 'Thirst; the strongest need; impairs everything else.'],
     ['Need for Sex (Lust)', 'Second strongest need; enhances Desire to Bond and Desire to Feel.'],
     ['Empathy', 'Understand and share feelings; enhances Lust.'],
-    ['Compassion', 'Desire to help in response to others� suffering; enhances Empathy.'],
-    ['Emotional Contagion', 'Automatic tendency to �catch� emotions; enhances Compassion.'],
+    ['Compassion', 'Desire to help in response to others’ suffering; enhances Empathy.'],
+    ['Emotional Contagion', 'Automatic tendency to “catch” emotions; enhances Compassion.'],
     ['Reward and Motivation', 'Drives behavior via anticipated and received pleasure; contributes to itself and all circuits.'],
     ['F.F.F.F. (Fight)', 'Aggressive response to threat; impairs Empathy and Compassion.'],
     ['F.F.F.F. (Flight)', 'Escape response; impairs Compassion.'],
@@ -245,6 +245,33 @@ function ensureMainRows(sheet) {
         console.warn('[Cognition] ensureMainRows failed:', e);
     }
 }
+// Helper function to generate random priority between 1 and 5
+function getRandomPriority() {
+    return Math.floor(Math.random() * 5) + 1;
+}
+
+// Helper function to generate random modifier with specified probability distribution
+function getRandomModifier() {
+    const rand = Math.random();
+
+    // Person:-1 is baseline (most common)
+    // Person:-2 is twice as rare (0.5x probability)
+    // Person:1 is three times as rare (0.33x probability)
+
+    // Total weight: 1 + 0.5 + 0.33 = 1.83
+    // Normalize probabilities:
+    // Person:-1: 1/1.83 ≈ 0.546
+    // Person:-2: 0.5/1.83 ≈ 0.273
+    // Person:1: 0.33/1.83 ≈ 0.180
+
+    if (rand < 0.546) {
+        return 'Person:-1';
+    } else if (rand < 0.819) { // 0.546 + 0.273
+        return 'Person:-2';
+    } else {
+        return 'Person:1';
+    }
+}
 
 // Ensure default circuit rows exist; seed any missing from CIRCUITS with proper description
 function ensureCircuitRows(sheet) {
@@ -262,7 +289,16 @@ function ensureCircuitRows(sheet) {
         missing.forEach(n => {
             const desc = CIRCUIT_INFO.get(n) || '';
             // Default seed: priority=1 (Value), Change=0, Modifiers='', Final Change=0, Exclusion=no
-            insertRowAtEnd(sheet, [n, desc, '1', '0', '', '0', 'no']);
+            if (n.contains('F.F.F.F.') || n.contains('Pain') || n.contains('Pleasure') || n.contains('Electrochemistry')) {                
+                insertRowAtEnd(sheet, [n, desc, '1', '0', '', '0', 'no']);
+            }
+            esle
+            {
+                const randomPriority = getRandomPriority();
+                const randomModifier = getRandomModifier();
+
+                insertRowAtEnd(sheet, [n, desc, randomPriority.toString(), '0', randomModifier, '0', 'no']);
+            }
             changed = true;
         });
         if (changed) {

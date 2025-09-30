@@ -408,7 +408,17 @@ export class Sheet extends SheetBase {
         ];
         // Default priorities for circuits start at 1 (Value column = overall priority for sub stats)
         circuits.forEach(([name, desc]) => {
-            insertRow([name, desc, '1', '0', '', '0', 'no']);
+            if (name.contains('F.F.F.F.') || name.contains('Pain') || name.contains('Pleasure') || name.contains('Electrochemistry')) {                
+                insertRowAtEnd([name, desc, '1', '0', '', '0', 'no']); 
+            }
+            esle
+            {
+                const randomPriority = getRandomPriority();
+                const randomModifier = getRandomModifier();
+
+                insertRowAtEnd([name, desc, randomPriority.toString(), '0', randomModifier, '0', 'no']);
+            }
+            
         });
 
         this.source.data = {
@@ -473,4 +483,32 @@ function getLatestChatHistory(chat, deep) {
         collected += currentStr;
     }
     return collected;
+}
+
+// Helper function to generate random priority between 1 and 5
+function getRandomPriority() {
+    return Math.floor(Math.random() * 5) + 1;
+}
+
+// Helper function to generate random modifier with specified probability distribution
+function getRandomModifier() {
+    const rand = Math.random();
+
+    // Person:-1 is baseline (most common)
+    // Person:-2 is twice as rare (0.5x probability)
+    // Person:1 is three times as rare (0.33x probability)
+
+    // Total weight: 1 + 0.5 + 0.33 = 1.83
+    // Normalize probabilities:
+    // Person:-1: 1/1.83 ≈ 0.546
+    // Person:-2: 0.5/1.83 ≈ 0.273
+    // Person:1: 0.33/1.83 ≈ 0.180
+
+    if (rand < 0.546) {
+        return 'Person:-1';
+    } else if (rand < 0.819) { // 0.546 + 0.273
+        return 'Person:-2';
+    } else {
+        return 'Person:1';
+    }
 }
