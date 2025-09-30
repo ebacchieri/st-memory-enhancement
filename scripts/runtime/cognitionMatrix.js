@@ -289,7 +289,7 @@ function ensureCircuitRows(sheet) {
         missing.forEach(n => {
             const desc = CIRCUIT_INFO.get(n) || '';
             // Default seed: priority=1 (Value), Change=0, Modifiers='', Final Change=0, Exclusion=no
-            if (n.contains('F.F.F.F.') || n.contains('Pain') || n.contains('Pleasure') || n.contains('Electrochemistry')) {                
+            if (n.includes('F.F.F.F.') || n.includes('Pain') || n.includes('Pleasure') || n.includes('Electrochemistry')) {                
                 insertRowAtEnd(sheet, [n, desc, '1', '0', '', '0', 'no']);
             }
             esle
