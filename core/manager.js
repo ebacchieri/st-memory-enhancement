@@ -69,6 +69,8 @@ export const BASE = {
     refreshContextView: refreshContextView,
     refreshTempView: refreshTempView,
     updateSystemMessageTableStatus: updateSystemMessageTableStatus,
+    // NEW: expose selector refresher so buildSheetsByTemplates can call BASE.updateSelectBySheetStatus()
+    updateSelectBySheetStatus: updateSelectBySheetStatus,
     get templates() {
         return USER.loadUserAllTemplates()
     },
@@ -134,8 +136,10 @@ export const BASE = {
                 try {
                     const memory = new BASE.Sheet(); memory.createDefaultMemoryTable();
                     const cognition = new BASE.Sheet(); cognition.createDefaultCognitionMatrixTable();
-                    memory.save(undefined, true);
-                    cognition.save(undefined, true);
+                    // Persist to context (save attaches to current piece if present)
+                    const {piece} = USER.getChatPiece() || {};
+                    memory.save(piece, true);
+                    cognition.save(piece, true);
                     DERIVED.any.chatSheetMap[memory.uid] = memory;
                     DERIVED.any.chatSheetMap[cognition.uid] = cognition;
                     process(memory); process(cognition);
@@ -291,6 +295,11 @@ export const BASE = {
                 memory.createDefaultMemoryTable();
                 const cognition = BASE.createChatSheet(8, 1);
                 cognition.createDefaultCognitionMatrixTable();
+
+                // Persist defaults to current context/piece so UI can render them
+                const { piece } = USER.getChatPiece() || {};
+                memory.save(piece, true);
+                cognition.save(piece, true);
                 
                 const hash_sheets = {}
                 hash_sheets[memory.uid] = memory.hashSheet.map(row => row.map(hash => hash));

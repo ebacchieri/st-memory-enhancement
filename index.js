@@ -67,15 +67,12 @@ function checkPrototype(dataTable) {
 
 export function buildSheetsByTemplates(targetPiece) {
     BASE.sheetsData.context = [];
-    // USER.getChatPiece().hash_sheets = {};
     const templates = BASE.templates
     templates.forEach(template => {
         if(template.enable === false) return
-
-        // 检查 template 结构
         if (!template || !template.hashSheet || !Array.isArray(template.hashSheet) || template.hashSheet.length === 0 || !Array.isArray(template.hashSheet[0]) || !template.cellHistory || !Array.isArray(template.cellHistory)) {
             console.error(`[Memory Enhancement] 在 buildSheetsByTemplates 中遇到无效的模板结构 (缺少 hashSheet 或 cellHistory)。跳过模板:`, template);
-            return; // 跳过处理此模板
+            return;
         }
         try {
             const newSheet = BASE.createChatSheetByTemp(template);
@@ -84,7 +81,8 @@ export function buildSheetsByTemplates(targetPiece) {
             EDITOR.error(`[Memory Enhancement] 从模板创建或保存 sheet 时出错:`, error.message, error);
         }
     })
-    BASE.updateSelectBySheetStatus()
+    // Safe call
+    try { BASE.updateSelectBySheetStatus() } catch {}
     USER.saveChat()
 }
 
@@ -365,13 +363,14 @@ function executeAction(EditAction, sheets) {
         return -1;
     }
 
-    // 在所有操作前，深度清理一次action.data
+    // prevent deleting rows from Cognition Matrix
+    const isCognition = sheet.name === 'Cognition Matrix';
+
     if (action.data) {
         action.data = fixUnescapedSingleQuotes(action.data);
     }
     switch (EditAction.type) {
-        case 'update':
-            // 执行更新操作
+        case 'update': {
             const rowIndex = action.rowIndex ? parseInt(action.rowIndex):0
             if(rowIndex >= sheet.getRowCount()-1) return executeAction({...EditAction, type:'insert'}, sheets)
             if(!action?.data) return
@@ -380,9 +379,10 @@ function executeAction(EditAction, sheets) {
                 if (!cell) return -1
                 cell.newAction(Cell.CellAction.editCell, { value }, false)
             })
-            break
+            break;
+        }
         case 'insert': {
-            // 执行插入操作
+            // allow rare insert into Cognition Matrix, but never delete
             const cell = sheet.findCellByPosition(sheet.getRowCount() - 1, 0)
             if (!cell) return -1
             cell.newAction(Cell.CellAction.insertDownRow, {}, false)
@@ -393,15 +393,19 @@ function executeAction(EditAction, sheets) {
                 if (index === 0) return 
                 cell.data.value = action.data[index - 1]
             })
+            break;
         }
-            break
-        case 'delete':
-            // 执行删除操作
+        case 'delete': {
+            if (isCognition) {
+                console.warn('Delete operation is blocked for Cognition Matrix.');
+                return -1;
+            }
             const deleteRow = parseInt(action.rowIndex) + 1
             const cell = sheet.findCellByPosition(deleteRow, 0)
             if (!cell) return -1
             cell.newAction(Cell.CellAction.deleteSelfRow, {}, false)
-            break
+            break;
+        }
     }
     console.log("执行表格编辑操作", EditAction)
     return 1
@@ -447,7 +451,7 @@ function formatParams(paramArray) {
             return parsed;
         }
 
-        // 其他情况都返回字符串
+        // 其他情况下都返回字符串
         return trimmed;
     });
 }
