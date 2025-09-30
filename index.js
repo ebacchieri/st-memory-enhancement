@@ -547,7 +547,6 @@ function getMesRole() {
  */
 async function onChatCompletionPromptReady(eventData) {
     try {
-        // Do not inject when disabled or dry run
         if (eventData.dryRun === true ||
             USER.tableBaseSetting.isExtensionAble === false ||
             USER.tableBaseSetting.isAiReadTable === false ||
@@ -555,28 +554,31 @@ async function onChatCompletionPromptReady(eventData) {
             return;
         }
 
-        // Build the snippet: Top-K cognition summary + Thinking prompt (no full table here)
+        // Build the snippet: Top-K cognition summary + Thinking prompt
         let cogSnippet = '';
         try { cogSnippet = buildCognitionTopKPrompt(); } catch {}
         let thinking = '';
         try { thinking = await getThinkingPromptText(); } catch {}
+
         const snippet = [cogSnippet, thinking].filter(Boolean).join('\n').trim();
         if (!snippet) return;
 
-        // Inject into the last user message content
+        // Append into the last user message content
         const chatArr = eventData.chat || [];
         let injected = false;
         for (let i = chatArr.length - 1; i >= 0; i--) {
             const m = chatArr[i];
             if (m && m.role === 'user' && typeof m.content === 'string') {
-                // Append snippet at the end of user's message
-                m.content = `${m.content}\n\n${snippet}`;
+                // Avoid duplicate injection if already present
+                if (!m.content.includes(cogSnippet) && !m.content.includes(thinking)) {
+                    m.content = `${m.content}\n\n${snippet}`;
+                }
                 injected = true;
                 break;
             }
         }
 
-        // Fallback: if no user message found, inject as a system message
+        // Fallback: no user message found -> inject as a single system message
         if (!injected) {
             const role = (function getMesRole() {
                 switch (USER.tableBaseSetting.injection_mode) {
@@ -589,7 +591,6 @@ async function onChatCompletionPromptReady(eventData) {
             chatArr.push({ role, content: snippet });
         }
 
-        // Update sheets status in UI
         updateSheetsView();
     } catch (error) {
         EDITOR.error(`记忆插件：表格数据注入失败\n原因：`, error.message, error);
@@ -947,28 +948,7 @@ jQuery(async () => {
     
     console.log("______________________记忆插件：加载完成______________________")
 });
-
-// Replace the existing helper with this implementation
-async function getThinkingPromptText() {
-    //// Try to load from assets/templates using the extension loader first
-    //try {
-    //    let tpl = await SYSTEM.getTemplate('ThinkingPrompt.txt');
-    //    if (typeof tpl !== 'string') {
-    //        tpl = String(tpl ?? '');
-    //    }
-    //    tpl = tpl.trim();
-    //    if (tpl) {
-    //        // Apply user tag replacements if present
-    //        try { tpl = replaceUserTag(tpl); } catch { }
-    //        return tpl;
-    //    }
-    //} catch (e) {
-    //    console.warn('[ThinkingPrompt] SYSTEM.getTemplate failed, will try direct fetch:', e);
-    //}
-
-    // Fallback: fetch directly from known template path
-    try {
-        const resp = `[OOC: Start your every response with Critical Thinking section, include following:
+const THINKING_PROMPT = `[OOC: Start your every response with Critical Thinking section, include following:
             < critical_thinking >
             \`\`\`
 [**CRITICAL THINKING SEQUENCE - {{char}} ONLY**]
@@ -1021,20 +1001,17 @@ Long-Term Plan:
 
             Cognition simulation is now finished. 
 When describing actions of { { char } } use created < critical_thinking > sequence as guideline, it's the core driver behind their actions]`;
-        //const resp = await fetch('third-party/st-memory-enhancement/assets/templates/ThinkingPrompt.txt', { cache: 'no-store' });
-        if (resp.ok) {
-            let text = (await resp.text() || '').trim();
-            if (text) {
-                try { text = replaceUserTag(text); } catch { }
-                return text;
-            }
-        } else {
-            console.warn('[ThinkingPrompt] HTTP fetch failed:', resp.status, resp.statusText);
+// Replace the existing helper with this implementation
+// Replace getThinkingPromptText with const-based resolver (no file I/O)
+async function getThinkingPromptText() {
+    try {
+        // 1) Global const (preferred)
+        if (typeof THINKING_PROMPT === 'string' ) {
+            return THINKING_PROMPT;
         }
+        
     } catch (e) {
-        console.warn('[ThinkingPrompt] Direct fetch failed:', e);
+        console.warn('[ThinkingPrompt] Using empty prompt. Reason:', e);
     }
-
-    // Final fallback: empty string (do not block prompt assembly)
     return '';
 }

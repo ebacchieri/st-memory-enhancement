@@ -516,9 +516,9 @@ export function buildCognitionTopKPrompt(kOverride = null) {
                 finalChange: row[idxFinal] ?? 0
             };
         }
-
+        const saLevel = parseFloat(main?.['Self-awareness']?.value ?? 2) || 2;
         const logicLevel = parseFloat(main?.['Logic']?.value ?? 2) || 2;
-        const k = kOverride != null ? kOverride : (2 + Math.max(0, Math.floor(logicLevel) - 2) * 2);
+        const k = kOverride != null ? kOverride : (2 + saLevel + Math.max(0, Math.floor(logicLevel) - 2) * 2);
 
         // Collect circuits
         const allRows = sheet.getContent(false);
