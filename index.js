@@ -565,41 +565,45 @@ async function onChatCompletionPromptReady(eventData) {
             return;
         }
 
-        // Build the snippet: Top-K cognition summary + Thinking prompt
+        // 1) Build all parts
         let cogSnippet = '';
         try { cogSnippet = buildCognitionTopKPrompt(); } catch {}
+
+        // Full instruction + table data block from message_template
+        let tableGuide = '';
+        try { tableGuide = initTableData(eventData); } catch {}
+
         let thinking = '';
         try { thinking = await getThinkingPromptText(); } catch {}
 
-        const snippet = [cogSnippet, thinking].filter(Boolean).join('\n').trim();
+        const snippet = [cogSnippet, tableGuide, thinking]
+            .filter(Boolean)
+            .join('\n\n')
+            .trim();
         if (!snippet) return;
 
-        // Append into the last user message content
+        // 2) Append into the last user message content (avoid duplicates)
         const chatArr = eventData.chat || [];
         let injected = false;
         for (let i = chatArr.length - 1; i >= 0; i--) {
             const m = chatArr[i];
-            if (m && m.role === 'user' && typeof m.content === 'string') {
-                // Avoid duplicate injection if already present
-                if (!m.content.includes(cogSnippet) && !m.content.includes(thinking)) {
-                    m.content = `${m.content}\n\n${snippet}`;
-                }
-                injected = true;
-                break;
+            if (!m || m.role !== 'user' || typeof m.content !== 'string') continue;
+
+            const alreadyHas =
+                (cogSnippet && m.content.includes('Cognition Summary')) ||
+                (tableGuide && (m.content.includes('Memory Enhancement Tables Guide') || m.content.includes('【表格内容】'))) ||
+                (thinking && m.content.includes(thinking.slice(0, Math.min(thinking.length, 24))));
+
+            if (!alreadyHas) {
+                m.content = `${m.content}\n\n${snippet}`;
             }
+            injected = true;
+            break;
         }
 
-        // Fallback: no user message found -> inject as a single system message
+        // 3) Fallback: if no user message found, inject as a system message once
         if (!injected) {
-            const role = (function getMesRole() {
-                switch (USER.tableBaseSetting.injection_mode) {
-                    case 'deep_system': return 'system';
-                    case 'deep_user': return 'user';
-                    case 'deep_assistant': return 'assistant';
-                    default: return 'system';
-                }
-            })();
-            chatArr.push({ role, content: snippet });
+            chatArr.push({ role: 'system', content: snippet });
         }
 
         updateSheetsView();
