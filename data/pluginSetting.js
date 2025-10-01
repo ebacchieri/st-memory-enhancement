@@ -171,8 +171,7 @@ export const defaultSettings = await switchLanguage('__defaultSettings__', {
 After generating content, generate summary of what just happened in the format of {place - characters - keywords - summary}, use short and descriptive language for summary, then use the <tableEdit> tag with JavaScript function syntax following this rule: insertRow(tableIndex:number, data:{[colIndex:string]:string|number}) to insert new row with that summary. Example: insertRow(0, {"0": "Library", "1": "Alice/Bob", "2": "study/research", "3": "Alice and Bob are studying for exams together"})
 
 # Important Operation Principles (Must Follow)
-- When <user> requests table modifications, <user>'s requirements have the highest priority.
-- Each response must perform appropriate insert, delete, or update operations based on the story context at the correct position. Fabricating information or filling in unknowns is prohibited.
+- Each response must perform appropriate insert operations based on the story context at the correct position. Fabricating information or filling in unknowns is prohibited.
 - When using insertRow function, provide data for all known columns and ensure the data:{[colIndex:string]:string|number} parameter includes all relevant colIndex values as strings.
 - Use forward slashes (/) for semantic separation within cells, but preserve spaces around them.
 - Prohibit double quotes in strings.
@@ -182,8 +181,6 @@ After generating content, generate summary of what just happened in the format o
 <tableEdit>
 <!--
 insertRow(0, {"0":"School Cafeteria","1":"<user>/Emma","2":"lunch/conversation","3":"<user> and Emma discuss weekend plans during lunch break"})
-updateRow(0, 1, {"3": "Emma reveals her feelings about the upcoming school dance"})
-deleteRow(0, 2)
 -->
 </tableEdit>
 `,
