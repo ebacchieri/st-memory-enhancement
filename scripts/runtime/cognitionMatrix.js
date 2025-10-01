@@ -50,26 +50,22 @@ const CIRCUIT_INFO = new Map([
     ['Electrochemistry', 'Other neuro-factors/drugs/emotions; can enhance or impair everything.'],
 ]);
 
-function idxByName(name) {
-    return CIRCUITS.indexOf(name);
-}
+function idxByName(name) { return CIRCUITS.indexOf(name); }
 
 // Build influence map
 function buildInfluence() {
     const N = CIRCUITS.length;
     const map = Array.from({ length: N }, () => new Map());
-
     const add = (from, to, w) => {
-        const i = idxByName(from);
-        if (i < 0) return;
-        const j = idxByName(to);
-        if (j < 0) return;
+        const i = idxByName(from); if (i < 0) return;
+        const j = idxByName(to); if (j < 0) return;
         map[i].set(j, (map[i].get(j) ?? 0) + w);
     };
 
     // Helpers
     const allOthers = (from) => CIRCUITS.filter(n => n !== from);
     const desires = ['Desire to Acquire','Desire to Bond','Desire to Learn','Desire to Defend','Desire to Feel'];
+
     // Need to Survive -> contributes to itself and FFFF; impairs other desires
     add('Need to Survive', 'Need to Survive', +1);
     ['F.F.F.F. (Fight)','F.F.F.F. (Flight)','F.F.F.F. (Freeze)','F.F.F.F. (Fawn)'].forEach(t => add('Need to Survive', t, +1));
@@ -101,7 +97,6 @@ function buildInfluence() {
     // Pleasure -> enhances every desire and need for sex
     desires.concat(['Need for Sex (Lust)']).forEach(t => add('Pleasure', t, +1));
     // Electrochemistry -> depends: apply sign of its base change later; influences all others
-    // Implementation detail: we mark all connections with weight 1, and we multiply by sign at runtime
     allOthers('Electrochemistry').forEach(t => add('Electrochemistry', t, +1));
 
     return map;
@@ -118,71 +113,58 @@ function parseModifiersCell(str = '') {
     const res = [];
     if (!str) return res;
     String(str).split('/').forEach(tok => {
-        const t = tok.trim();
-        if (!t) return;
+        const t = tok.trim(); if (!t) return;
         const [name, val] = t.split(':');
         const v = parseNumberSafe(val, 0);
         res.push({ name: (name || '').trim(), value: v });
     });
     return res;
 }
-
 function formatModifiersCell(items) {
     if (!Array.isArray(items) || items.length === 0) return '';
     return items.map(i => `${i.name}:${i.value}`).join('/');
 }
 
-// Parse Change cell: allow "N" or "N; v:+M"
+// Parse Change cell: allow "N" (legacy allowed "N; v:+M", v ignored now)
 function parseChangeCell(str = '') {
-    if (!str) return { base: 0, v: 0 };
-    let base = 0, v = 0;
+    if (!str) return { base: 0 };
+    let base = 0;
     const parts = String(str).split(/;|,/).map(s => s.trim()).filter(Boolean);
     for (const p of parts) {
-        if (/^v\s*:\s*([+\-]?\d+(\.\d+)?)$/i.test(p)) {
-            const m = p.match(/^v\s*:\s*([+\-]?\d+(\.\d+)?)$/i);
-            v = parseNumberSafe(m?.[1], 0);
-        } else {
-            const n = parseNumberSafe(p, NaN);
-            if (Number.isFinite(n)) base = n;
-        }
+        const n = parseNumberSafe(p, NaN);
+        if (Number.isFinite(n)) base = n;
     }
-    return { base, v };
+    return { base };
 }
 
-function getHeaderIndexMap(sheet) {
-    const header = sheet.getHeader();
-    const map = new Map();
-    header.forEach((h, idx) => map.set(h, idx));
-    return map;
+// Cooldown parser: supports "no" or "yes" or "yes(N)"
+function parseCooldownCell(str = '') {
+    const s = String(str || '').trim().toLowerCase();
+    if (s === 'no' || s === '') return { active: false, remain: 0 };
+    const m = s.match(/^yes(?:\s*\((\d+)\))?$/i);
+    if (!m) return { active: true, remain: 1 };
+    const r = parseInt(m[1] ?? '1', 10);
+    return { active: true, remain: Number.isFinite(r) ? r : 1 };
+}
+function formatCooldown(remain) {
+    return remain > 0 ? `yes(${remain})` : 'no';
 }
 
-function getRows(sheet) {
-    // returns rows of values (without header/index col)
-    return sheet.getContent(false);
-}
-
+function getRows(sheet) { return sheet.getContent(false); }
 function findRowIndexByName(sheet, name) {
     const rows = getRows(sheet);
     const header = sheet.getHeader();
     const nameCol = header.indexOf('Name');
     if (nameCol < 0) return -1;
     for (let i = 0; i < rows.length; i++) {
-        if (String(rows[i][nameCol]) === name) {
-            return i + 1; // +1 to account for header
-        }
+        if (String(rows[i][nameCol]) === name) return i + 1;
     }
     return -1;
 }
-
-function getCell(sheet, rowIdx, colIdx) {
-    // rowIdx, colIdx are zero-based with header included
-    return sheet.findCellByPosition(rowIdx, colIdx);
-}
-
+function getCell(sheet, rowIdx, colIdx) { return sheet.findCellByPosition(rowIdx, colIdx); }
 function clamp(n, min, max) { return Math.max(min, Math.min(max, n)); }
 
 function insertRowAtEnd(sheet, values) {
-    // values are in display order: [Name, Description, Value, Change, Modifiers, Final Change, Volition Exclusion]
     const cell0 = sheet.findCellByPosition(sheet.getRowCount() - 1, 0);
     if (!cell0) return;
     cell0.newAction(sheet.constructor.Cell?.CellAction?.insertDownRow ?? sheet.cells.get(sheet.hashSheet[0][0]).constructor.CellAction.insertDownRow, {}, false);
@@ -197,102 +179,59 @@ function insertRowAtEnd(sheet, values) {
 // Ensure main stat rows exist; seed defaults if missing
 function ensureMainRows(sheet) {
     try {
-        const header = sheet.getHeader();
-        const idxName = header.indexOf('Name');
-        if (idxName < 0) return;
-
         const need = (n) => findRowIndexByName(sheet, n) < 1;
         let changed = false;
-
         if (need('Complexity')) {
             insertRowAtEnd(sheet, [
                 'Complexity',
                 'Overall state of mind; improves above 80, critical below 15. Base temporal decay -1 each turn. Affected by circuits fulfillment and Logic.',
-                '50', '', 'Base Decay:-1/Logic Modifier:0', '0', 'no'
+                '50', '', 'Base Decay:-1/Logic Modifier:0', '0', 'no', ''
             ]);
             changed = true;
         }
         if (need('Logic')) {
-            insertRowAtEnd(sheet, [
-                'Logic',
+            insertRowAtEnd(sheet, ['Logic',
                 'Ability to create proper actions. Levels 0..5+. Each level below 2: Complexity -2; above 2: Complexity +2.',
-                getRandomValue(), '', '', '', 'no'
+                getRandomValue(), '', '', '', 'no', ''
             ]);
             changed = true;
         }
         if (need('Self-awareness')) {
-            insertRowAtEnd(sheet, [
-                'Self-awareness',
+            insertRowAtEnd(sheet, ['Self-awareness',
                 'Defines how many circuits can be affected by Volition. Levels 0..5+; default 2.',
-                getRandomValue(), '', '', '', 'no'
+                getRandomValue(), '', '', '', 'no', ''
             ]);
             changed = true;
         }
         if (need('Volition')) {
-            insertRowAtEnd(sheet, [
-                'Volition',
+            insertRowAtEnd(sheet, ['Volition',
                 'Ability to resist/suppress a circuit or enforce change. Levels 0..5+; default 2.',
-                getRandomValue(), '', '', '', 'no'
+                getRandomValue(), '', '', '', 'no', ''
             ]);
             changed = true;
         }
-
         if (changed) {
             const { piece } = USER.getChatPiece() || {};
             if (piece) sheet.save(piece, true);
         }
-    } catch (e) {
-        console.warn('[Cognition] ensureMainRows failed:', e);
-    }
+    } catch (e) { console.warn('[Cognition] ensureMainRows failed:', e); }
 }
+
 // Helper function to generate random priority between 1 and 5
-function getRandomPriority() {
-    return Math.floor(Math.random() * 5) + 1;
-}
+function getRandomPriority() { return Math.floor(Math.random() * 5) + 1; }
 function getRandomValue() {
     const rand = Math.random();
-
-    // Person:-1 is baseline (most common)
-    // Person:-2 is twice as rare (0.5x probability)
-    // Person:1 is three times as rare (0.33x probability)
-
-    // Total weight: 1 + 0.5 + 0.33 = 1.83
-    // Normalize probabilities:
-    // Person:-1: 1/1.83 ≈ 0.546
-    // Person:-2: 0.5/1.83 ≈ 0.273
-    // Person:1: 0.33/1.83 ≈ 0.180
-
-    if (rand < 0.62) {
-        return '2';
-    } else if (rand < 0.93) { // 0.546 + 0.273
-        return '3';
-    } else if (rand < 0.98) { // 0.546 + 0.273
-        return '4';
-    } else {
-        return '5';
-    }
+    if (rand < 0.62) return '2';
+    else if (rand < 0.93) return '3';
+    else if (rand < 0.98) return '4';
+    else return '5';
 }
 // Helper function to generate random modifier with specified probability distribution
 function getRandomModifier() {
     const rand = Math.random();
-
-    // Person:-1 is baseline (most common)
-    // Person:-2 is twice as rare (0.5x probability)
-    // Person:1 is three times as rare (0.33x probability)
-
-    // Total weight: 1 + 0.5 + 0.33 = 1.83
-    // Normalize probabilities:
-    // Person:-1: 1/1.83 ≈ 0.546
-    // Person:-2: 0.5/1.83 ≈ 0.273
-    // Person:1: 0.33/1.83 ≈ 0.180
-
-    if (rand < 0.546) {
-        return 'Person:-1';
-    } else if (rand < 0.819) { // 0.546 + 0.273
-        return 'Person:-2';
-    } else {
-        return 'Person:1';
-    }
+    if (rand < 0.546) return 'Person:1';
+    else if (rand < 0.819) return 'Person:2';
+    else return 'Person:-1';
 }
 
 // Ensure default circuit rows exist; seed any missing from CIRCUITS with proper description
@@ -310,13 +249,11 @@ function ensureCircuitRows(sheet) {
         let changed = false;
         missing.forEach(n => {
             const desc = CIRCUIT_INFO.get(n) || '';
-            // Default seed: priority=1 (Value), Change=0, Modifiers='', Final Change=0, Exclusion=no
-            if (n.includes('F.F.F.F.') || n.includes('Pain') || n.includes('Pleasure') || n.includes('Electrochemistry')) {                
-                insertRowAtEnd(sheet, [n, desc, '1', '0', '', '0', 'no']);
-            }
-            else
-            {
-                insertRowAtEnd(sheet, [n, desc, getRandomPriority().toString(), '0', getRandomModifier(), '0', 'no']);
+            // Default seed: priority, base change, modifiers, final, cooldown, satisfaction
+            if (n.includes('F.F.F.F.') || n.includes('Pain') || n.includes('Pleasure') || n.includes('Electrochemistry')) {
+                insertRowAtEnd(sheet, [n, desc, '1', '0', '', '0', 'no', '0']);
+            } else {
+                insertRowAtEnd(sheet, [n, desc, getRandomPriority().toString(), '0', getRandomModifier(), '0', 'no', '0']);
             }
             changed = true;
         });
@@ -324,9 +261,7 @@ function ensureCircuitRows(sheet) {
             const { piece } = USER.getChatPiece() || {};
             if (piece) sheet.save(piece, true);
         }
-    } catch (e) {
-        console.warn('[Cognition] ensureCircuitRows failed:', e);
-    }
+    } catch (e) { console.warn('[Cognition] ensureCircuitRows failed:', e); }
 }
 
 // Main computation entry
@@ -335,97 +270,93 @@ export function updateCognitionMatrixAfterEdits(allSheets) {
         const sheet = allSheets.find(s => s.name === 'Cognition Matrix');
         if (!sheet) return;
 
-        const header = sheet.getHeader();
+        // Header indices (+compat)
+        let header = sheet.getHeader();
         const idxName = header.indexOf('Name');
-        const idxDesc = header.indexOf('Description');
-        const idxValue = header.indexOf('Value');
-        const idxChange = header.indexOf('Change');
+        const idxVal = header.indexOf('Value');
+        const idxChg = header.indexOf('Change');
         const idxMods = header.indexOf('Modifiers');
-        const idxFinal = header.indexOf('Final Change');
-        const idxExcl = header.indexOf('Volition Exclusion');
+        let idxFinal = header.indexOf('Final Change');
+        let idxCd = header.indexOf('Cooldown'); if (idxCd < 0) idxCd = header.indexOf('Volition Exclusion');
+        let idxSat = header.indexOf('Satisfaction');
 
-        if ([idxName, idxValue, idxChange, idxMods, idxFinal, idxExcl].some(i => i < 0)) return;
+        // Auto-rename legacy header
+        if (header.indexOf('Volition Exclusion') >= 0) {
+            const cell = sheet.findCellByPosition(0, (header.indexOf('Volition Exclusion') + 1));
+            if (cell) cell.data.value = 'Cooldown';
+            header = sheet.getHeader(); idxCd = header.indexOf('Cooldown');
+        }
 
-        // Seed required rows if missing
-        const idxRowComplexity0 = findRowIndexByName(sheet, 'Complexity');
-        const idxRowLogic0 = findRowIndexByName(sheet, 'Logic');
-        const idxRowSA0 = findRowIndexByName(sheet, 'Self-awareness');
-        const idxRowVolition0 = findRowIndexByName(sheet, 'Volition');
-        if (idxRowComplexity0 < 1 || idxRowLogic0 < 1 || idxRowSA0 < 1 || idxRowVolition0 < 1) {
+        if ([idxName, idxVal, idxChg, idxMods, idxFinal].some(i => i < 0) || idxCd < 0) return;
+
+        // Seed rows if needed
+        if (['Complexity','Logic','Self-awareness','Volition'].some(n => findRowIndexByName(sheet, n) < 1)) {
             ensureMainRows(sheet);
         }
         ensureCircuitRows(sheet);
 
-        // Recompute indices after potential seeding
+        header = sheet.getHeader();
         const idxRowComplexity = findRowIndexByName(sheet, 'Complexity');
         const idxRowLogic = findRowIndexByName(sheet, 'Logic');
         const idxRowSA = findRowIndexByName(sheet, 'Self-awareness');
-        const idxRowVolition = findRowIndexByName(sheet, 'Volition');
+        const idxRowVol = findRowIndexByName(sheet, 'Volition');
 
-        if (idxRowComplexity < 1 || idxRowLogic < 1 || idxRowSA < 1 || idxRowVolition < 1) {
-            console.warn('[Cognition] Missing main stat rows');
-        }
-
-        const valOf = (rowIdxHeaderBased) => {
-            const c = getCell(sheet, rowIdxHeaderBased, idxValue + 1);
-            return parseNumberSafe(c?.data?.value ?? 0, 0);
-        };
+        const getNum = (rowIdx, colIdx) => parseNumberSafe(getCell(sheet, rowIdx, colIdx + 1)?.data?.value ?? 0, 0);
         const setCellValue = (rowIdx, colIdx, v) => {
             const c = getCell(sheet, rowIdx, colIdx + 1);
             if (c) c.data.value = String(v);
         };
 
-        const logicLevel = valOf(idxRowLogic);
-        const volitionLevel = valOf(idxRowVolition);
+        const logicLevel = getNum(idxRowLogic, idxVal);
+        const saLevel = getNum(idxRowSA, idxVal);
+        const volitionLevel = getNum(idxRowVol, idxVal);
 
-        // Collect circuit rows: all rows excluding the 4 main stat rows
+        // Collect circuit rows (exclude main stats)
         const mainNames = new Set(['Complexity','Logic','Self-awareness','Volition']);
         const circuitRows = [];
-        const rows = sheet.getContent(false);
-        const rowCount = rows.length;
-        for (let i = 1; i <= rowCount; i++) {
-            const nameCell = getCell(sheet, i, idxName + 1);
-            const name = nameCell?.data?.value;
+        const totalRows = sheet.getContent(false).length;
+        for (let i = 1; i <= totalRows; i++) {
+            const name = getCell(sheet, i, idxName + 1)?.data?.value;
             if (!name || mainNames.has(name)) continue;
-            const valueCell = getCell(sheet, i, idxValue + 1);
-            const changeCell = getCell(sheet, i, idxChange + 1);
-            const modsCell = getCell(sheet, i, idxMods + 1);
-            const finalCell = getCell(sheet, i, idxFinal + 1);
-            const exclCell = getCell(sheet, i, idxExcl + 1);
+            const priority = getNum(i, idxVal);
+            const changeText = getCell(sheet, i, idxChg + 1)?.data?.value ?? '';
+            const modsText = getCell(sheet, i, idxMods + 1)?.data?.value ?? '';
+            const finalOld = getNum(i, idxFinal);
+            const cdVal = getCell(sheet, i, idxCd + 1)?.data?.value ?? 'no';
+            const cd = parseCooldownCell(cdVal);
+            const satisfactionOld = idxSat >= 0 ? getNum(i, idxSat) : 0;
+
             circuitRows.push({
                 rowIdx: i,
                 name,
-                priority: parseNumberSafe(valueCell?.data?.value ?? 0, 0),
-                changeText: changeCell?.data?.value ?? '',
-                modsText: modsCell?.data?.value ?? '',
-                excl: String(exclCell?.data?.value ?? 'no').toLowerCase() === 'yes',
-                finalText: finalCell?.data?.value ?? '',
+                priority,
+                changeText,
+                modsText,
+                finalOld,
+                cooldownRemain: cd.remain,
+                satisfactionOld
             });
         }
 
-        // Pre-parse base change and volition deltas
+        // Pre-parse base change and long-term modifiers
         const baseChange = new Map();   // name -> base number
-        const volitionDelta = new Map();// name -> v number
         const longTermSum = new Map();  // name -> sum number
         circuitRows.forEach(r => {
-            const { base, v } = parseChangeCell(r.changeText);
+            const { base } = parseChangeCell(r.changeText);
             baseChange.set(r.name, base);
-            volitionDelta.set(r.name, v);
-            longTermSum.set(r.name, parseModifiersCell(r.modsText).reduce((a,b) => a + (b.value||0), 0));
+            longTermSum.set(r.name, parseModifiersCell(r.modsText).reduce((a,b) => a + (b.value || 0), 0));
         });
 
-        // Influence computation
+        // Influence aggregation (raw sum)
         const baseByIndex = CIRCUITS.map(n => baseChange.get(n) ?? 0);
         // Electrochemistry sign correction
         const electroIdx = idxByName('Electrochemistry');
         const electroSign = Math.sign(baseByIndex[electroIdx] || 0) || 0;
 
-        const influenceSum = new Map(); // name -> number
+        const influenceRaw = new Map(); // name -> raw sum
         for (let t = 0; t < CIRCUITS.length; t++) {
             const targetName = CIRCUITS[t];
-            // Skip if target row doesn't exist in sheet
-            const exists = circuitRows.find(cr => cr.name === targetName);
-            if (!exists) continue;
+            if (!circuitRows.find(cr => cr.name === targetName)) continue;
 
             let sum = 0;
             for (let s = 0; s < CIRCUITS.length; s++) {
@@ -433,41 +364,71 @@ export function updateCognitionMatrixAfterEdits(allSheets) {
                 let w = INFL[s].get(t) ?? 0;
                 if (w === 0) continue;
 
-                // Electrochemistry influences everything with weight * sign(electro base)
                 if (s === electroIdx) {
                     w = w * (electroSign || 0);
                 }
 
-                // Basic rule: source's base change sign contributes +/- 1 * weight
                 const sourceBase = baseByIndex[s] || 0;
                 const srcSign = Math.sign(sourceBase) || 0;
                 sum += (srcSign * w);
             }
-            influenceSum.set(targetName, sum);
+            influenceRaw.set(targetName, sum);
         }
 
-        // Final change and priority updates
+        // Final change (cumulative) and updates
         let complexityDeltaFromCircuits = 0;
         const updatedCircuits = [];
         for (const r of circuitRows) {
             const base = baseChange.get(r.name) ?? 0;
-            const v = volitionDelta.get(r.name) ?? 0;
-            const lsum = longTermSum.get(r.name) ?? 0;
-            const infl = influenceSum.get(r.name) ?? 0;
+            const raw = influenceRaw.get(r.name) ?? 0;
+            const inflDelta = Math.sign(raw); // +1 enhancement, -1 impairment, 0 neutral
 
-            const finalChange = base + v + lsum + infl;
+            // New cumulative final change (apply cooldown dampening first), then clamp to [-10, 10]
+            const perTurnDelta = base + inflDelta;
+            const candidate = r.finalOld + perTurnDelta;
+            const inCooldownBefore = r.cooldownRemain > 0;
+            const finalNewUnclamped = inCooldownBefore ? (0.5 * candidate) : candidate;
+            const finalNew = clamp(finalNewUnclamped, -10, 10);
 
-            // Write Final Change
-            setCellValue(r.rowIdx, idxFinal, String(finalChange));
+            // Priority = old + modifiers -> clamp to [1..10]
+            const newPriority = clamp((r.priority ?? 0) + (longTermSum.get(r.name) ?? 0), 1, 10);
+            setCellValue(r.rowIdx, idxVal, String(newPriority));
 
-            // Apply processing exclusion
-            const processedChange = r.excl ? 0 : finalChange;
+            // Satisfaction computation
+            // raw = finalNew / newPriority; clip positive side to 1, keep negative down to -10; store with 2 decimals
+            let sat = 0;
+            if (newPriority > 0) sat = finalNew / newPriority;
+            // clip positive to 1
+            sat = Math.min(sat, 1);
+            // guard extreme negative (bounded by finalNew/prio anyway); keep within [-10, 1] for safety
+            sat = clamp(sat, -10, 1);
 
-            // Update priority = old - processedChange
-            const newPriority = clamp((r.priority ?? 0) - processedChange, 0, 10);
-            setCellValue(r.rowIdx, idxValue, String(newPriority));
+            if (idxSat >= 0) {
+                setCellValue(r.rowIdx, idxSat, sat.toFixed(2));
+            }
 
-            complexityDeltaFromCircuits += processedChange;
+            // Cooldown duration update
+            // Step1: tick down if was active
+            let nextRemain = inCooldownBefore ? Math.max(0, r.cooldownRemain - 1) : 0;
+            // Step2: trigger/extend when Satisfaction >= 1
+            if (sat >= 1) nextRemain += 4;
+            setCellValue(r.rowIdx, idxCd, formatCooldown(nextRemain));
+
+            // Persist Final Change (clamped)
+            setCellValue(r.rowIdx, idxFinal, String(finalNew));
+
+            // Complexity contribution per circuit using new rule:
+            // circuitImpact = Satisfaction * Abs(FinalChange + baseChange)
+            const impactMagnitude = Math.abs(finalNew + base);
+            const circuitImpact = sat * impactMagnitude;
+            const vsBuffer = volitionLevel + saLevel;
+
+            if ((circuitImpact < 0 && Math.abs(circuitImpact) <= vsBuffer) || circuitImpact > 0) {
+                complexityDeltaFromCircuits += (inflDelta + circuitImpact);
+            } else {
+                complexityDeltaFromCircuits += inflDelta;
+            }
+
             updatedCircuits.push({ ...r, newPriority });
         }
 
@@ -475,14 +436,14 @@ export function updateCognitionMatrixAfterEdits(allSheets) {
         updatedCircuits.sort((a, b) => (b.newPriority - a.newPriority) || a.name.localeCompare(b.name));
 
         // Build new value sheet for rebuild (include Name column)
-        const headerNames = sheet.getHeader(); // ['Name','Description',...]
+        const headerNames = sheet.getHeader();
         const mainRows = ['Complexity','Logic','Self-awareness','Volition'].map(n => {
             const ri = findRowIndexByName(sheet, n);
             const rowVals = headerNames.map((_, ci) => {
                 const cell = getCell(sheet, ri, ci + 1);
                 return cell?.data?.value ?? '';
             });
-            return rowVals; // keep Name column
+            return rowVals;
         });
 
         const circuitsSortedValues = updatedCircuits.map(u => {
@@ -491,7 +452,7 @@ export function updateCognitionMatrixAfterEdits(allSheets) {
                 const cell = getCell(sheet, ri, ci + 1);
                 return cell?.data?.value ?? '';
             });
-            return rowVals; // keep Name column
+            return rowVals;
         });
 
         const valueSheet = [
@@ -511,24 +472,28 @@ export function updateCognitionMatrixAfterEdits(allSheets) {
 
         // Re-fetch indices after rebuild
         const complexityRow = findRowIndexByName(sheet, 'Complexity');
-        const logicRow = findRowIndexByName(sheet, 'Logic');
-        // Complexity modifiers cell: ensure Base Decay and Logic Modifier included
-        const complexityModsCell = getCell(sheet, complexityRow, idxMods + 1);
-        const existingMods = parseModifiersCell(complexityModsCell?.data?.value ?? '');
-        // remove existing Logic Modifier, Base Decay and re-add clean
+        const idxMods2 = sheet.getHeader().indexOf('Modifiers');
+        const complexityModsCell = getCell(sheet, complexityRow, idxMods2 + 1);
+        const existingMods = parseModifiersCell(complexityModsCell?.data?.value ?? '')
+
+        // Complexity modifiers maintenance
         const filtered = existingMods.filter(m => !/^Logic Modifier$/i.test(m.name) && !/^Base Decay$/i.test(m.name));
         const logicModValue = (logicLevel > 2 ? (logicLevel - 2) * 2 : (logicLevel < 2 ? (logicLevel - 2) * 2 : 0));
         filtered.push({ name: 'Base Decay', value: -1 });
         filtered.push({ name: 'Logic Modifier', value: logicModValue });
         if (complexityModsCell) complexityModsCell.data.value = formatModifiersCell(filtered);
 
+        const idxFinal2 = sheet.getHeader().indexOf('Final Change');
+        const idxValue2 = sheet.getHeader().indexOf('Value');
+
+        // Apply base/logic on top of aggregated per-circuit contribution
         const finalComplexityDelta = complexityDeltaFromCircuits + (-1) + logicModValue;
 
         // Update Complexity Final Change and Value
-        const complexityFinalCell = getCell(sheet, complexityRow, idxFinal + 1);
+        const complexityFinalCell = getCell(sheet, complexityRow, idxFinal2 + 1);
         if (complexityFinalCell) complexityFinalCell.data.value = String(finalComplexityDelta);
 
-        const complexityValueCell = getCell(sheet, complexityRow, idxValue + 1);
+        const complexityValueCell = getCell(sheet, complexityRow, idxValue2 + 1);
         const oldComplexity = parseNumberSafe(complexityValueCell?.data?.value ?? 50, 50);
         const newComplexity = oldComplexity + finalComplexityDelta;
         if (complexityValueCell) complexityValueCell.data.value = String(newComplexity);
@@ -550,15 +515,13 @@ export function buildCognitionTopKPrompt(kOverride = null) {
         const idxName = header.indexOf('Name');
         const idxVal = header.indexOf('Value');
         const idxFinal = header.indexOf('Final Change');
-        const idxExcl = header.indexOf('Volition Exclusion');
-        if ([idxName, idxVal, idxFinal, idxExcl].some(i => i < 0)) return '';
+        let idxCd = header.indexOf('Cooldown'); if (idxCd < 0) idxCd = header.indexOf('Volition Exclusion');
+        if ([idxName, idxVal, idxFinal, idxCd].some(i => i < 0)) return '';
 
         const getRowByName = (n) => {
             const rows = sheet.getContent(false);
             const nameIdx = header.indexOf('Name');
-            for (let i = 0; i < rows.length; i++) {
-                if (String(rows[i][nameIdx]) === n) return rows[i];
-            }
+            for (let i = 0; i < rows.length; i++) if (String(rows[i][nameIdx]) === n) return rows[i];
             return null;
         };
 
@@ -566,35 +529,34 @@ export function buildCognitionTopKPrompt(kOverride = null) {
         const main = {};
         for (const n of mainNames) {
             const row = getRowByName(n);
-            if (row) main[n] = {
-                value: row[idxVal],
-                finalChange: row[idxFinal] ?? 0
-            };
+            if (row) main[n] = { value: row[idxVal], finalChange: row[idxFinal] ?? 0 };
         }
         const saLevel = parseFloat(main?.['Self-awareness']?.value ?? 2) || 2;
         const logicLevel = parseFloat(main?.['Logic']?.value ?? 2) || 2;
         const k = kOverride != null ? kOverride : (2 + saLevel + Math.max(0, Math.floor(logicLevel) - 2) * 2);
 
-        // Collect circuits
         const allRows = sheet.getContent(false);
         const circuits = allRows.filter(r => !!r[idxName] && !mainNames.includes(String(r[idxName])));
         const parsed = circuits.map(r => ({
             name: r[idxName],
             priority: parseFloat(r[idxVal]) || 0,
             final: parseFloat(r[idxFinal]) || 0,
-            excl: String(r[idxExcl] || 'no').toLowerCase() === 'yes'
+            excl: String(r[idxCd] || 'no').toLowerCase().startsWith('yes')
         }));
 
-        // Sort by priority desc then name
-        parsed.sort((a,b) => (b.priority - a.priority) || a.name.localeCompare(b.name));
-        const top = parsed.slice(0, Math.max(0, k));
+        // Sort by priority (desc) regardless of cooldown
+        parsed.sort((a, b) => (b.priority - a.priority) || a.name.localeCompare(b.name));
 
-        const ms = `Cognition Summary\n- Main: Complexity=${main?.Complexity?.value ?? ''} (${(main?.Complexity?.finalChange ?? 0) >= 0 ? '+' : ''}${main?.Complexity?.finalChange ?? 0}), Logic=${main?.Logic?.value ?? ''}, Self-awareness=${main?.['Self-awareness']?.value ?? ''}, Volition=${main?.Volition?.value ?? ''}`;
+        // Then take only top-K that are NOT on cooldown
+        const top = parsed.filter(c => !c.excl).slice(0, Math.max(0, k));
+
+        const ms = `Cognition Summary
+- Main: Complexity=${main?.Complexity?.value ?? ''} (${(main?.Complexity?.finalChange ?? 0) >= 0 ? '+' : ''}${main?.Complexity?.finalChange ?? 0}), Logic=${main?.Logic?.value ?? ''}, Self-awareness=${main?.['Self-awareness']?.value ?? ''}, Volition=${main?.Volition?.value ?? ''}`;
         const list = top.map((c, i) =>
-            `  ${i+1}. ${c.name} | priority=${c.priority} | final=${c.final >= 0 ? '+' : ''}${c.final} | excl=${c.excl ? 'yes' : 'no'}`
+            `  ${i+1}. ${c.name} | priority=${c.priority} | final=${c.final >= 0 ? '+' : ''}${c.final} | cooldown=no`
         ).join('\n');
 
-        return `${ms}\n- Top ${top.length} circuits:\n${list}`.trim();
+        return `${ms}\n- Top ${top.length} circuits (not on cooldown):\n${list}`.trim();
     } catch (e) {
         console.warn('[Cognition] buildCognitionTopKPrompt failed:', e);
         return '';

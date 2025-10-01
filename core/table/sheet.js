@@ -338,7 +338,7 @@ export class Sheet extends SheetBase {
 
     // NEW: default Cognition Matrix table builder
     createDefaultCognitionMatrixTable() {
-        this.init(8, 1); // +1 index col
+        this.init(9, 1); // +1 index col, 8 data columns
         this.uid = `sheet_${SYSTEM.generateRandomString(8)}`;
         this.name = 'Cognition Matrix';
         this.domain = 'chat';
@@ -355,7 +355,8 @@ export class Sheet extends SheetBase {
         header[4].data.value = 'Change';
         header[5].data.value = 'Modifiers';
         header[6].data.value = 'Final Change';
-        header[7].data.value = 'Volition Exclusion';
+        header[7].data.value = 'Cooldown';
+        header[8].data.value = 'Satisfaction';
 
         // Helper to insert a row (values correspond to header starting at col 1)
         const insertRow = (values) => {
@@ -369,21 +370,21 @@ export class Sheet extends SheetBase {
             });
         };
 
-        // Main stats (from CoreParams)
+        // Main stats
         insertRow(['Complexity',
             'Overall state of mind; improves above 80, critical below 15. Base temporal decay -1 each turn. Affected by circuits fulfillment and Logic.',
-            '50', '', 'Base Decay:-1/Logic Modifier:0', '0', 'no']);
+            '50', '', 'Base Decay:-1/Logic Modifier:0', '0', 'no', '']);
         insertRow(['Logic',
             "Ability to create proper course of actions. Levels 0..5+, avg 2. Each level below 2: Complexity -2; above 2: Complexity +2.",
-            getRandomValue(), '', '', '', 'no']);
+            getRandomValue(), '', '', '', 'no', '']);
         insertRow(['Self-awareness',
             'Defines how many circuits can be affected by Volition. Levels 0..5+; default 2.',
-            getRandomValue(), '', '', '', 'no']);
+            getRandomValue(), '', '', '', 'no', '']);
         insertRow(['Volition',
             'Ability to resist/suppress a circuit or enforce change. Levels 0..5+; default 2.',
-            getRandomValue(), '', '', '', 'no']);
+            getRandomValue(), '', '', '', 'no', '']);
 
-        // Circuits (from CircuitsDefinition)
+        // Circuits
         const circuits = [
             ['Desire to Acquire', 'The drive to accumulate and possess things, whether tangible or intangible.'],
             ['Desire to Bond', 'The need to be loved and valued in relationships with others.'],
@@ -406,23 +407,19 @@ export class Sheet extends SheetBase {
             ['Pleasure', 'Positive experience; enhances every desire and need for sex.'],
             ['Electrochemistry', 'Other neuro-factors/drugs/emotions; can enhance or impair everything.']
         ];
-        // Default priorities for circuits start at 1 (Value column = overall priority for sub stats)
         circuits.forEach(([name, desc]) => {
-            if (name.includes('F.F.F.F.') || name.includes('Pain') || name.includes('Pleasure') || name.includes('Electrochemistry')) {                
-                insertRow([name, desc, '1', '0', '', '0', 'no']); 
+            if (name.includes('F.F.F.F.') || name.includes('Pain') || name.includes('Pleasure') || name.includes('Electrochemistry')) {
+                insertRow([name, desc, '1', '0', '', '0', 'no', '0']);
+            } else {
+                insertRow([name, desc, getRandomPriority().toString(), '0', getRandomModifier(), '0', 'no', '0']);
             }
-            else
-            {
-                insertRow([name, desc, getRandomPriority().toString(), '0', getRandomModifier(), '0', 'no']);
-            }
-            
         });
 
         this.source.data = {
-            note: 'Main stats + circuits with priorities and per-turn fulfillment. Use: Value (main overall / sub priority), Change (base for circuits), Modifiers (long-term; e.g., fatigue, drugs), Final Change (computed), Volition Exclusion (yes/no).',
-            initNode: 'On first run initialize baseline values; in later runs update Change, Modifiers, and Volition intents.',
-            insertNode: 'Insert only when introducing a new circuit subtype or persistent modifier row (rare).',
-            updateNode: 'Update Change/Modifiers/Volition Exclusion for circuits; update main stats Values if one-time changes occur.',
+            note: 'Main stats + circuits. Value=overall (main)/priority (sub). Change=base (sub). Modifiers=long-term. Final Change is cumulative: without cooldown = old + base + influenceΔ; with cooldown = 0.5*(old + base + influenceΔ). Cooldown is yes(N) with duration in turns (decrements each turn, triggers when Satisfaction>=1 for +4 turns, extends by +4 if retriggered). Satisfaction = Final Change / Priority (clamped -10..10). Priority adjusted by Modifiers only.',
+            initNode: 'On first run initialize baseline values; in later runs update Change, Modifiers, and Cooldown.',
+            insertNode: 'Insert only when introducing a new circuit subtype or persistent modifier category (rare).',
+            updateNode: 'Update Change/Modifiers/Cooldown for circuits; update main stats Values if one-time changes occur.',
             deleteNode: 'Remove obsolete rows if a circuit subtype is no longer used.'
         };
 
@@ -488,23 +485,12 @@ function getRandomPriority() {
 }
 function getRandomValue() {
     const rand = Math.random();
-
-    // Person:-1 is baseline (most common)
-    // Person:-2 is twice as rare (0.5x probability)
-    // Person:1 is three times as rare (0.33x probability)
-
-    // Total weight: 1 + 0.5 + 0.33 = 1.83
-    // Normalize probabilities:
-    // Person:-1: 1/1.83 ≈ 0.546
-    // Person:-2: 0.5/1.83 ≈ 0.273
-    // Person:1: 0.33/1.83 ≈ 0.180
-
     if (rand < 0.62) {
         return '2';
-    } else if (rand < 0.93) { // 0.546 + 0.273
+    } else if (rand < 0.93) {
         return '3';
-    } else if (rand < 0.98) { // 0.546 + 0.273
-    return '4';
+    } else if (rand < 0.98) {
+        return '4';
     } else {
         return '5';
     }
@@ -512,22 +498,11 @@ function getRandomValue() {
 // Helper function to generate random modifier with specified probability distribution
 function getRandomModifier() {
     const rand = Math.random();
-
-    // Person:-1 is baseline (most common)
-    // Person:-2 is twice as rare (0.5x probability)
-    // Person:1 is three times as rare (0.33x probability)
-
-    // Total weight: 1 + 0.5 + 0.33 = 1.83
-    // Normalize probabilities:
-    // Person:-1: 1/1.83 ≈ 0.546
-    // Person:-2: 0.5/1.83 ≈ 0.273
-    // Person:1: 0.33/1.83 ≈ 0.180
-
     if (rand < 0.546) {
-        return 'Person:-1';
-    } else if (rand < 0.819) { // 0.546 + 0.273
-        return 'Person:-2';
-    } else {
         return 'Person:1';
+    } else if (rand < 0.819) {
+        return 'Person:2';
+    } else {
+        return 'Person:-1';
     }
 }

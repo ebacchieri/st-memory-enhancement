@@ -284,7 +284,7 @@ export const BASE = {
             try {
                 const memory = BASE.createChatSheet(5, 1);
                 memory.createDefaultMemoryTable();
-                const cognition = BASE.createChatSheet(8, 1);
+                const cognition = BASE.createChatSheet(9, 1);
                 cognition.createDefaultCognitionMatrixTable();
                 const { piece } = USER.getChatPiece() || {};
                 memory.save(piece, true);

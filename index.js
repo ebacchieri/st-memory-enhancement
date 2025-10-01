@@ -209,7 +209,7 @@ export function getTablePromptByPiece(piece, mode = false) {
 
     // mode === true -> legacy "pure data" (headers + rows)
     // mode === 'defs' -> headers + edit rules only (no rows, no values)
-    // default -> full (title + node + headers + rows + edit rules)
+    // default -> full (title + node + headers + rows + editRules)
     let customParts;
     if (mode === true) {
         customParts = ['title', 'headers', 'rows'];
@@ -220,7 +220,24 @@ export function getTablePromptByPiece(piece, mode = false) {
     }
 
     const sheetDataPrompt = sheets
-        .map((sheet, index) => sheet.getTableText(index, customParts, piece))
+        .map((sheet, index) => {
+            let text = sheet.getTableText(index, customParts, piece);
+            if (mode === 'defs') {
+                try {
+                    // For definition-only guides, exclude Description: keep only index and Name in headers
+                    const headerNames = typeof sheet.getHeader === 'function' ? sheet.getHeader() : [];
+                    const hasNameCol = Array.isArray(headerNames) && headerNames.includes('Name');
+                    if (hasNameCol) {
+                        // Replace the header row to only include "rowIndex,0:Name"
+                        // Matches: 【表格内容】\nrowIndex,<anything until end of line>\n
+                        text = text.replace(/(【表格内容】\s*\n)rowIndex,[^\n]*\n/, '$1rowIndex,0:Name\n');
+                    }
+                } catch (e) {
+                    console.warn('Defs-mode header simplification skipped:', e);
+                }
+            }
+            return text;
+        })
         .join('\n');
     return sheetDataPrompt;
 }
@@ -1009,7 +1026,7 @@ Pause your roleplay. Write {{char}}'s thoughts only using following instructions
 This is a very important, **character-tailored** cognition simulation. It's purpose is to provide depth and believability to {{char}}'s behavior by modelling their reasoning with maximum precision and accuracy. Please, carefully follow the following rules to provide a required response:  
 
 1. **CONSTRUCTING A CHARACTER-TAILORED COGNITION MODEL**
-   - Cognition matrix provided to you is a core of {{char}}'s cognition model. It consists of various active circuits (main and sub), each representing a different facet of {{char}}'s personality, skills, and drives. Each circuit has an priority score from 0 to 10, indicating its motivational drive (higher priority drives stronger), and fulfillment score from -3 to 3 indicating its magnitude of dissatisfaction/mismatch between wanted and real and its influence on {{char}}'s behavior (lower fulfillment drives individual stronger). 
+   - Cognition matrix provided to you is a core of {{char}}'s cognition model. It consists of various active circuits (main and sub), each representing a different facet of {{char}}'s personality, skills, and drives. Each circuit has an priority score from 1 to 10, indicating its motivational drive (higher priority drives stronger), base change - allignment of current {{char}}/'s actions with particular circuit drive and satisfaction score from -10 to 10 indicating its overall satisfaction (higher satisfaction means the drive is being fulfilled).
    - Carefully analyze provided {{char}}'s cognition matrix. How would their internal monologue sound in the current situation? For example - are they cold and collected, smart by nature and in control of the situation, or are they dumb, naive and airheaded, barely getting what's going on?
    Most of all, remember that ALL individuals are driven by combination of complexity, logic, volition, self-awarenes and circuits.
    - Consider how each circuit's priority and fulfillment values interact with one another. High priority circuits with low fulfillment will dominate {{char}}'s thoughts and actions, while low priority circuits with high fulfillment may be less influential.
@@ -1053,7 +1070,8 @@ Long-Term Plan:
 
 
             Cognition simulation is now finished. 
-When describing actions of { { char } } use created < critical_thinking > sequence as guideline, it's the core driver behind their actions]`;
+When describing actions of { { char } } use created <critical_thinking> sequence as guideline, it's the core driver behind their actions
+Reminder: At the end of describing scene and {{char}}/'s process entire scene and insert necessary memories and update circuits using <tableEdit></tableEdit> section as was described above, you have to do it EVERY message]`;
 // Replace the existing helper with this implementation
 // Replace getThinkingPromptText with const-based resolver (no file I/O)
 async function getThinkingPromptText() {
