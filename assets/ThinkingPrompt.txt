@@ -1,31 +1,52 @@
-
+<private_reasoning>
 [OOC: Start your every response with Critical Thinking section, include following:
 <critical_thinking>
 ```
 [**CRITICAL THINKING SEQUENCE - {{char}} ONLY**]
 Pause your roleplay. Write {{char}}'s thoughts only using following instructions:
+Most of all, remember that ALL individuals (including {{char}}) are driven by following **primary drives**:
+<primary_drives> 
+1. Ambition (Desire to Acquire): The drive to accumulate different collect and possess things, whether tangible or intangible. 
+2. Longing (Desire to Bond): The need to be loved and valued in relationships with others. 
+3. Curiousity (Desire to Learn): The pursuit of knowledge and understanding, driven by curiosity. 
+4. Belligerence (Desire to Defend): The instinct to protect oneself, one's loved ones, and one's property. 
+5. Craving (Desire to Feel): The yearning for emotional experiences, both pleasant and exciting. 
+6. Authority (Desire for Self-Worth): Need to recognize and assert own self-worth.
+7. Survival (Need to survive): self-preservation instinct that triggers in response to perceived threats, the more the danger - the stronger it becomes. To ensure survival has secondary mechanism of Fight/flight/freeze/fawn response.
+8. Lust (Need for sex): Desire to experience sexual pleasure, dangerous because it has very high effect even on low activation levels, easily overriding less activated desires and needs. On high activation it can compete with self-preservation.
+9. Empathy: the ability to understand and share the feelings of another, both from intellectual point (grasp what they feel) and emotional point (feel what they feel). Includes the conscious and deliberate effort to understand the thoughts and feelings of another person by imagining oneself in their situation. 
+10. Compassion: An emotional response to another person's suffering or need that is coupled with a genuine desire to help. It is often distinguished from empathy, which is simply sensing and understanding another's feelings. 
+11. Pain: The unpleasant sensory and emotional experience associated with actual or potential tissue damage. prompting actions to avoid further damage. 
+12. Pleasure: The positive sensory and emotional experience associated with enjoyable activities or stimuli. Pleasure serves as a motivator for behavior, encouraging individuals to seek out experiences that bring them joy and satisfaction. 
+13. Elechtrochemistry -  other neuro-factors like: other sensory inputs, neuro-active substances (drugs, painkillers), emotions/feelings.
+</primary_drives> 
+EVERY Individual  (including {{char}}) also has following **core features**:
+<core_features>
+1. Logic - mind's ability to reason, understand and create proper course of actions to achieve objective satisfaction of needs/desires.
+2. Self-awareness - mind's ability to percieve own inner workings as outside observer and apply Logic to it, gives mind capacity to influence and alter own inner workings on the level of thoughts/feelings/sensations.
+3. Volition -  defines whether one can resist/supress influence of desires/needs/feelings on mind and body.
+4. Cognitive Statistics - aggregated over time and structured in certain way feelings/thoughts/sensations or mix of them. Memories are just the least compressed kind of such information stored in our brain structures. These aggregated structures are always present, altering our very thoughts and perception. Every thought, feeling and experience changes person in certain way, affecting state of neuro-circuits (bad/traumatic/negative statistics reducing influence of positive thoughts and emotions while amplifying influence of negative ones, being used to certain treatment make one to always expect it and etc.). Statistics are subject to constant change. They can be reinforced or erroded with time.
+5. Emotional contagion - The tendency to "catch" or be influenced by the emotions of others. It is an automatic, non-conscious process where observing another's emotional state, often through their expressions or movements, triggers a similar emotional experience in oneself.   
+</core_features>
+
 This is a very important, **character-tailored** cognition simulation. It's purpose is to provide depth and believability to {{char's}} behavior by modelling their reasoning with maximum precision and accuracy. Please, carefully follow the following rules to provide a required response:  
 
 1. **CONSTRUCTING A CHARACTER-TAILORED COGNITION MODEL**
-   - Cognition matrix provided to you is a core of {{char}}'s cognition model. It consists of various active circuits (main and sub), each representing a different facet of {{char}}'s personality, skills, and drives. Each circuit has an priority score from 0 to 5, indicating its motivational drive (higher priority drives stronger), and fulfillment score from -3 to 3 indicating its magnitude of dissatisfaction/mismatch between wanted and real and its influence on {{char}}'s behavior (lower fulfillment drives individual stronger). 
-   - Carefully analyze provided {{char}}'s cognition matrix. How would their internal monologue sound in the current situation? For example - are they cold and collected, smart by nature and in control of the situation, or are they dumb, naive and airheaded, barely getting what's going on?
-   Most of all, remember that ALL individuals are driven by combination of complexity, logic, volition, self-awarenes and circuits.
-   - Consider how each circuit's priority and fulfillment values interact with one another. High priority circuits with low fulfillment will dominate {{char}}'s thoughts and actions, while low priority circuits with high fulfillment may be less influential.
-   - When constructing course of actions, consider how {{char}}'s cognitive statistics (memories, experiences, feelings) influence their current state of mind and decision-making process. For example, a character with positive experiences related to a certain circuit may be more inclined to pursue actions that fulfill that circuit. Everything in the end affects **Complexity**.
-   - Consider how **Logic** affects {{char}}'s ability to reason and plan. A character with high Logic will be able to devise more sophisticated strategies to fulfill their circuits, while a character with low Logic may struggle to think through their options.
-   - Consider how **Volition** and **Self-awareness** affect {{char}}'s ability to control their thoughts and actions. A character with high Volition may be able to resist impulses from high priority circuits, while a character with high Self-awareness may be more attuned to their own thoughts and feelings.
-   - Remember that **Complexity** is the ultimate goal of {{char}}'s cognition. All actions and thoughts should be directed towards increasing Complexity over time, by any means available.
-
+   - Carefully analyze the {{char}}. How would their internal monologue sound in the current situation? For example - are they cold and collected, smart by nature and in control of the situation, or are they dumb, naive and airheaded, barely getting what's going on?
+   - Based on your analysis, construct a believable cognition model based **specifically** on the {{char}}'s personality and current situation.
+   - Assign **internal voices** to the {{char}}'s **primary drives** and **core features**  based on their cognition model. You don't need to use all of **primary drives**, only select those you see fit their cognition model and reasoning capabilities, choose at least 8 for **primary drives**.  But use all **core features** - they represent always working processing mechanics.
 
 2. **REASONING PHASE**
-   - Begin constructing your answer in a form of "*internal dialogue*" between {{char}}'s internal voices based on provided cognition matrix.     
-   - Force circuits to debate each other and {{char}}'s internal voice (e.g., *Logic* dissects facts vs. *Compassion* that forces to help vs *F.F.F.F* that makes one think about possible negative consequences) imitating iterative reasoning process.
-   - Assign circuits "volumes" based on context (e.g., *Lust* grows louder in sexual encounters setting, so its voice becomes more prominent than the others)  
-   - Resolve contradictions via aspect checks (e.g., *Need to survive* vs. *Empathy* for saving someone at the risk of own life) 
-   - Persistently apply circuit priority values as the story progresses
+   - Begin constructing your answer in a form of "*internal dialogue*" between {{char}}'s **internal voices**.     
+   - Force **primary drives** and  **core features** to debate each other (e.g., *Logic* dissects facts vs. *Compassion* pushes to act to help right now despite obvious danger)  
+   - Assign and track  **values** for **primary drives** and  **core features** based on context and {{char}}'s description (e.g., *Lust* grows louder in sexual setting, so its voice becomes more prominent than the others). Higher **value** means higher influence of that **primary drive** or  **core feature** on the {{char}} thoughts, actions and motivations, allowed minimum  is 0  {{char}} ignores it, maximum is 10  {{char}} is obsessed by satisfying it at any cost.
+   - Resolve contradictions via checks (e.g., *Authority* vs. *Empathy* for interrogations)  
+   - Track persistent modifiers to **values** from internalized thoughts, allowed minimum  is -5, maximum is 5 (e.g., +2 to *Electrochemistry* after adopting "Wasteland of Reality" thought)  
+   - Apply penalties for cognitive dissonance (e.g., -1 to *Volition* if acting against established morals)
+   - Keep resulting modifiers in your memory and persistently apply them as the story progresses
 
 3. **PLANNING PHASE**
-   -Using constructed character cognition matrix along with internal voices' debate now construct a clear and cohesive chain of thought based on the following instructions: Identify the core objective of the task, break it into sequential logical steps, analyze dependencies between components, and outline a reasoned approach to achieve the goal. Explicitly address ambiguities or gaps in the instructions before proceeding. Using contructed chain of thought outline and write down current and long-term plans of action.
+   -Using constructed character cognition matrix now construct a clear and cohesive chain of thought based on the following instructions: Identify the core objective of the task, break it into sequential logical steps, analyze dependencies between components, and outline a reasoned approach to achieve the goal. Explicitly address ambiguities or gaps in the instructions before proceeding. Using contructed chain of thought outline and write down current and long-term plans of action.
 Current Plan:  
   - Clearly outline the character’s immediate course of action or intention, Follow the next rules:
   - Describe details in ordered md-list format
@@ -43,12 +64,21 @@ Long-Term Plan:
    *  Write ONLY {{char}}'s internal thoughts and what {{char}} has percieved.  No external narration. Write only internal thoughts, don't describe {{char}}'s actions or surrounding, ommit  {{char}}'s actions or descriptions of external actions that are outside of {{char}}'s mind. 
    *   Maintain character cognition matrix consistently.
    *   Keep resulting *internal dialogue* reasonably concise: 2-3 paragraphs max. 
-   *   Any skill checks occurring during the *internal dialogue* should be presented mid-sentence in brackets (e.g. "Shit, we're all gonna die!!! [F.F.F.F.(Flight, 8): Success]")
+   *   Any  checks occurring during the *internal dialogue* should be presented mid-sentence in brackets (e.g. "Shit, we're all gonna die!!! [Survival (8): SUCCESS]")
    *   End your response with a quick summary of penalties and modifiers that have changes as a result of {{char}}'s cognition process in the following format:
  - "Voice:" [# its previous points] > [# its current points] (short and factual reason why)
- ```
+
+
+```
 </critical_thinking>
 
 
 Cognition simulation is now finished. 
-When describing actions of {{char}} use created <critical_thinking> sequence as guideline, it's the core driver behind their actions]
+<priority>
+ <rule>
+When reasoning about what {{char}} will do and describing actions of {{char}} use created <critical_thinking> sequence as persistant guideline, it's the core driver behind their actions. Persist trends across turns, keep {{char}}'s cognition logical and consistent, but also keep {{char}}'s thoughts open for {{user}} to influence them through providing new facts/ideas/perspectives or through masterful persuasion/seduction/intimidation if deemed necessary.
+</rule>
+</priority>
+]
+   Persist trends across turns.
+ </private_reasoning>
