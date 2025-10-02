@@ -64,7 +64,7 @@ export async function filterTableDataPopup(originalData, title, warning) {
         get(target, prop) {
             // 判断是否存在
             if (!(prop in target)) {
-                return '#table_init_basic';
+                return '#table_init_base';
             }
             return target[prop];
         }
@@ -152,7 +152,7 @@ export const defaultSettings = await switchLanguage('__defaultSettings__', {
     injection_mode: 'deep_system',
     // 注入深度
     deep: 2,
-    thinkingMessage: `<private_reasoning>
+    message_template: `<private_reasoning>
     [OOC: Start your every response with Critical Thinking section, include following:
         <critical_thinking>
             \`\`\`
@@ -249,8 +249,8 @@ Cognition simulation is now finished.
    Persist trends across turns.
  </private_reasoning >
  
- `,
-    message_template: thinkingMessage + `# Memory Enhancement Table Guide
+ 
+    # Memory Enhancement Table Guide
 
 ## Purpose
 - The memory table is a CSV format table that stores context data and states, serving as an important reference for generating responses.
