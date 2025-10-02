@@ -155,7 +155,7 @@ export const defaultSettings = await switchLanguage('__defaultSettings__', {
     thinkingMessage: `<private_reasoning>
     [OOC: Start your every response with Critical Thinking section, include following:
         <critical_thinking>
-            /`/`/`
+            \`\`\`
             [/**CRITICAL THINKING SEQUENCE - {{char}} ONLY**]
             Pause your roleplay. Write {{char}}'s thoughts only using following instructions:
             Most of all, remember that ALL individuals (including {{char}}) are driven by **primary drives**.
@@ -235,7 +235,7 @@ export const defaultSettings = await switchLanguage('__defaultSettings__', {
  - "Voice:" [# its previous points] > [# its current points] (short and factual reason why)
 
 
-            /`/`/`
+            \`\`\`
         </critical_thinking>
 
 
