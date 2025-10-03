@@ -539,6 +539,7 @@ function getMesRole() {
  * @param {*} eventData
  * @returns
  */
+// REPLACE the existing onChatCompletionPromptReady with this version
 async function onChatCompletionPromptReady(eventData) {
     try {
         // 优先处理分步填表模式
@@ -556,7 +557,7 @@ async function onChatCompletionPromptReady(eventData) {
                     console.log("分步填表模式：注入只读表格数据", eventData.chat);
                 }
             }
-            return; // 处理完分步模式后直接退出，不执行后续的常规注入
+            return; // 分步模式直接退出
         }
 
         // 常规模式的注入逻辑
@@ -568,17 +569,35 @@ async function onChatCompletionPromptReady(eventData) {
         }
 
         console.log("生成提示词前", USER.getContext().chat)
-        const promptContent = initTableData(eventData)
-        if (USER.tableBaseSetting.deep === 0)
-            eventData.chat.push({ role: getMesRole(), content: promptContent })
-        else
-            eventData.chat.splice(-USER.tableBaseSetting.deep, 0, { role: getMesRole(), content: promptContent })
+
+        // Build both prompts
+        const thinkingContent = initThinkingData(eventData); // thinking_template with <previous_thinking> replaced
+        const promptContent = initTableData(eventData);      // message_template with {{tableData}} replaced
+
+        const role = getMesRole();
+        const inserts = [];
+
+        // Inject thinking_template first, then message_template (same role, same depth)
+        if (thinkingContent && thinkingContent.trim().length > 0) {
+            inserts.push({ role, content: thinkingContent });
+        }
+        if (promptContent && promptContent.trim().length > 0) {
+            inserts.push({ role, content: promptContent });
+        }
+
+        if (inserts.length > 0) {
+            if (USER.tableBaseSetting.deep === 0) {
+                eventData.chat.push(...inserts);
+            } else {
+                eventData.chat.splice(-USER.tableBaseSetting.deep, 0, ...inserts);
+            }
+        }
 
         updateSheetsView()
     } catch (error) {
-        EDITOR.error(`记忆插件：表格数据注入失败\n原因：`,error.message, error);
+        EDITOR.error(`记忆插件：表格数据注入失败\n原因：`, error.message, error);
     }
-    console.log("注入表格总体提示词", eventData.chat)
+    console.log("注入表格总体提示词 + 思考提示词", eventData.chat)
 }
 
 /**
@@ -647,6 +666,40 @@ export function getTableEditTag(mes) {
     }
     const updatedText = mes.replace(regex, "");
     return { matches }
+}
+
+// ADD: helper to extract the latest <critical_thinking> section
+function getLatestAssistantCriticalThinkingSection() {
+    try {
+        const chat = USER.getContext().chat || [];
+        for (let i = chat.length - 1; i >= 0; i--) {
+            const c = chat[i];
+            if (c && c.is_user === false && typeof c.mes === 'string') {
+                const match = c.mes.match(/<critical_thinking>[\s\S]*?<\/critical_thinking>/i);
+                if (match && match[0]) {
+                    return match[0]; // return the whole section including tags
+                }
+            }
+        }
+    } catch (e) {
+        console.error('Failed to extract latest <critical_thinking> section:', e);
+    }
+    return '';
+}
+
+// ADD: build thinking prompt from settings, replacing <previous_thinking>
+function initThinkingData(eventData) {
+    try {
+        let tpl = USER.tableBaseSetting?.thinking_template || '';
+        if (!tpl || typeof tpl !== 'string') return '';
+        const prev = getLatestAssistantCriticalThinkingSection();
+        const replaced = tpl.replace('<previous_thinking>', prev);
+        const promptContent = replaceUserTag(replaced);
+        return promptContent;
+    } catch (error) {
+        EDITOR.error('记忆插件：思考提示词注入失败\n原因：', error.message, error);
+        return '';
+    }
 }
 
 /**
