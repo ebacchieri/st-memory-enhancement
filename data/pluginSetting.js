@@ -156,7 +156,7 @@ export const defaultSettings = await switchLanguage('__defaultSettings__', {
     thinking_template: `
     Latest thoughts and feelings:
         <previous_thinking>
-    [OOC: Start your every response with  <critical_thinking> Critical Thinking</critical_thinking>section, include following:
+    [OOC: Start your every response with Critical Thinking section described below, include following:
         <critical_thinking>
             \`\`\`
             [**CRITICAL THINKING SEQUENCE - {{char}} ONLY**]
