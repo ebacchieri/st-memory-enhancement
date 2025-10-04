@@ -203,7 +203,7 @@ export const defaultSettings = await switchLanguage('__defaultSettings__', {
             - Track persistent modifiers to **values** from internalized thoughts, allowed minimum  is -2, maximum is 2 (e.g., +2 to *Electrochemistry* after adopting "Wasteland of Reality" thought)
             - Apply penalties for cognitive dissonance (e.g., -1 to *Volition* if acting against established morals)
             - Keep resulting modifiers in your memory and persistently apply them as the story progresses
-            - Assign **internal voices** to the {{ char }}'s **primary drives** and **core features**  based on their cognition model. You don't need to use all of **primary drives**, only select those you see fit their cognition model and reasoning capabilities, choose at least 8 for **primary drives**.  But use all **core features** - they represent always working processing mechanics.
+            - Assign **internal voices** to the {{ char }}'s **primary drives** and **core features**  based on their cognition model. List all **primary drives** and **core features** perspectives and debates as **internal voices** of the {{char}}. Each **internal voice** should reflect the nature of its corresponding **primary drive** or **core feature** (e.g., *Survival* screams about danger and calls to run, *Logic* dissects facts and concludes that danger is high, *Compassion* pushes to act to help right now despite obvious danger).
             - Modify **Values** accordingly to context.
 
             2. **REASONING PHASE**
@@ -230,7 +230,7 @@ export const defaultSettings = await switchLanguage('__defaultSettings__', {
 
 
             4. **OUTPUT FORMAT**
-            *  Write ONLY {{char}}'s internal thoughts, what {{char}} has percieved and **primary drives** and **core features** perspectives/debates and *Values* and their change and plans, nothing else.  No external narration. Write only internal thoughts, don't describe {{char }'s actions or surrounding, ommit  {{char}}'s actions or descriptions of external actions that are outside of {{char}}'s mind.
+            *  Write ONLY {{char}}'s internal thoughts, what {{char}} has percieved, all **primary drives** and **core features** perspectives/debates and *Values* and their change and plans, nothing else.  No external narration. Write only internal thoughts, don't describe {{char }'s actions or surrounding, ommit  {{char}}'s actions or descriptions of external actions that are outside of {{char}}'s mind.
             *   Maintain character cognition matrix consistently.
             *   Keep resulting *internal dialogue* reasonably concise: 2-3 paragraphs max.
             *   Any  checks occurring during the *internal dialogue* should be presented mid-sentence in brackets (e.g. "Shit, we're all gonna die!!! [Survival (8): SUCCESS]")
