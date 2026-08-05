@@ -641,13 +641,14 @@ function __buildStmBase(eventData, promptContent, thinkingContent, stm) {
     // Fallback: if nothing collected, take all
     if (indices.length === 0) indices = fullChat.map((_, i) => i);
 
-    const applyNameMacros = (s) => {
-        if (typeof s !== 'string') return '';
-        return s
-            .replace(/{{user}}/gi, userName)
-            .replace(/<user>/g, userName)
-            .replace(/{{char}}/gi, charName)
-            .replace(/{{character}}/gi, charName);
+    // --- replace __applyNameMacros ---
+    const __applyNameMacros = (s) => {
+        const { userName, charName } = getCurrentChatNames();
+        return __expandTemplateMacros(s, {
+            user: userName,
+            char: charName
+        })
+            .replace(/<user>/gi, userName);
     };
 
     const stripReasoning = (text) => {
@@ -708,38 +709,88 @@ const replaceInMessages = (msgs, regex, replacement = '') =>
         ...m,
         content: typeof m.content === 'string' ? m.content.replace(regex, replacement) : m.content
     }));
-const applyReplaceInPlace = (msgs, regex, replacement = '') => {
-    if (!msgs) return;
 
-    // If a single string was passed, just return the cleaned string (no mutation)
+// --- add near other helpers (before applyReplaceInPlace / __stripBlocksInPlace) ---
+function __escapeRegex(text) {
+    return String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function __toGlobalRegex(regexOrText) {
+    if (regexOrText instanceof RegExp) {
+        const flags = regexOrText.flags.includes('g')
+            ? regexOrText.flags
+            : `${regexOrText.flags}g`;
+        return new RegExp(regexOrText.source, flags);
+    }
+    return new RegExp(__escapeRegex(String(regexOrText)), 'g');
+}
+
+function __buildTagBlockRegex(tagName) {
+    const t = __escapeRegex(String(tagName || '').trim());
+    // supports case differences + optional spaces around tag name and slash
+    return new RegExp(`<\\s*${t}\\s*>[\\s\\S]*?<\\s*\\/\\s*${t}\\s*>`, 'gi');
+}
+
+function __stripTagBlocksFromText(text, tags) {
+    if (typeof text !== 'string' || !text) return text;
+    const list = Array.isArray(tags) ? tags : [tags];
+    let out = text;
+    list.forEach(tag => {
+        if (!tag) return;
+        out = out.replace(__buildTagBlockRegex(tag), '');
+    });
+    return out;
+}
+
+function __wrapInstructionTag(tagName, content) {
+    const tag = String(tagName || '').trim();
+    const bodyRaw = String(content ?? '');
+    const body = __stripTagBlocksFromText(bodyRaw, tag).trim(); // avoid nested duplicate tags
+    return `<${tag}>\n${body}\n</${tag}>`;
+}
+
+function __expandTemplateMacros(tpl, ctx = {}) {
+    const map = {
+        narration: ctx.narration ?? '',
+        thinking: ctx.thinking ?? '',
+        main: ctx.main ?? '',
+        previous_summary: ctx.previous_summary ?? '',
+        summary: ctx.summary ?? '',
+        user: ctx.user ?? '',
+        char: ctx.char ?? '',
+        character: ctx.character ?? ''
+    };
+
+    return String(tpl ?? '').replace(/{{\s*([a-z_]+)\s*}}/gi, (match, key) => {
+        const k = String(key).toLowerCase();
+        return Object.prototype.hasOwnProperty.call(map, k) ? String(map[k]) : '';
+    });
+}
+// --- replace existing applyReplaceInPlace ---
+const applyReplaceInPlace = (msgs, regexOrText, replacement = '') => {
+    const rx = __toGlobalRegex(regexOrText);
+    if (!msgs) return msgs;
+
     if (typeof msgs === 'string') {
-        return msgs.replace(regex, replacement);
+        return msgs.replace(rx, replacement);
     }
 
-    // If an array of messages was passed, mutate in place
     if (Array.isArray(msgs)) {
         msgs.forEach(m => {
             if (!m) return;
-            if (typeof m.content === 'string') {
-                m.content = m.content.replace(regex, replacement);
-            }
-            // Also clean assistant/user content stored in `mes`
-            if (typeof m.mes === 'string') {
-                m.mes = m.mes.replace(regex, replacement);
-            }
+            if (typeof m.content === 'string') m.content = m.content.replace(rx, replacement);
+            if (typeof m.mes === 'string') m.mes = m.mes.replace(rx, replacement);
         });
         return msgs;
     }
 
-    // If an object-like single message was passed, mutate both `content` and `mes`
     if (typeof msgs === 'object') {
-        if (typeof msgs.content === 'string') {
-            msgs.content = msgs.content.replace(regex, replacement);
-        }
-        if (typeof msgs.mes === 'string') {
-            msgs.mes = msgs.mes.replace(regex, replacement);
-        }
+        if (typeof msgs.content === 'string') msgs.content = msgs.content.replace(rx, replacement);
+        if (typeof msgs.mes === 'string') msgs.mes = msgs.mes.replace(rx, replacement);
+        return msgs;
     }
+
+    return msgs;
 };
 
 
@@ -763,8 +814,8 @@ function __applyThinkingInjection(eventData) {
         //applyReplaceInPlace(eventData.chat, /<_beat>[\s\S]*?<\/_beat>/gi, '');
         //applyReplaceInPlace(eventData.chat, /<_sexd>[\s\S]*?<\/_sexd>/gi, '');
         //applyReplaceInPlace(eventData.chat, /<_sex>[\s\S]*?<\/_sex>/gi, '');
-        const wrapped = `<thinking_instructions>\n${thinkingContent.trim()}\n</thinking_instructions>`;
-
+        // --- in __applyThinkingInjection ---
+        const wrapped = __wrapInstructionTag('thinking_instructions', thinkingContent.trim());
         if (lastUserIdx !== -1) {
             const prev = eventData.chat[lastUserIdx].content || '';
             eventData.chat[lastUserIdx].content = `${wrapped}\n\n${prev}`;
@@ -777,32 +828,30 @@ function __applyThinkingInjection(eventData) {
     }
 }
 // Remove all occurrences of specific XML-like blocks by tag names (no regex)
+// --- replace existing __stripBlocksInPlace ---
 function __stripBlocksInPlace(messages, tags) {
-    if (!Array.isArray(messages)) return;
-    const normTags = Array.isArray(tags) ? tags : [tags];
-    const removeTag = (text, tag) => {
-        if (typeof text !== 'string' || !text) return text;
-        const openTag = `<${tag}>`;
-        const closeTag = `</${tag}>`;
-        let start = text.indexOf(openTag);
-        // Remove all occurrences
-        while (start !== -1) {
-            const end = text.indexOf(closeTag, start + openTag.length);
-            if (end === -1) break; // malformed; stop to avoid infinite loop
-            text = text.slice(0, start) + text.slice(end + closeTag.length);
-            start = text.indexOf(openTag);
-        }
-        return text;
-    };
-    messages.forEach(m => {
-        if (!m) return;
-        if (typeof m.content === 'string') {
-            normTags.forEach(tag => { m.content = removeTag(m.content, tag); });
-        }
-        if (typeof m.mes === 'string') {
-            normTags.forEach(tag => { m.mes = removeTag(m.mes, tag); });
-        }
-    });
+    if (!messages) return messages;
+
+    if (typeof messages === 'string') {
+        return __stripTagBlocksFromText(messages, tags);
+    }
+
+    if (Array.isArray(messages)) {
+        messages.forEach(m => {
+            if (!m) return;
+            if (typeof m.content === 'string') m.content = __stripTagBlocksFromText(m.content, tags);
+            if (typeof m.mes === 'string') m.mes = __stripTagBlocksFromText(m.mes, tags);
+        });
+        return messages;
+    }
+
+    if (typeof messages === 'object') {
+        if (typeof messages.content === 'string') messages.content = __stripTagBlocksFromText(messages.content, tags);
+        if (typeof messages.mes === 'string') messages.mes = __stripTagBlocksFromText(messages.mes, tags);
+        return messages;
+    }
+
+    return messages;
 }
 // Strict prompt copy: only role + string content, no shared references
 function __promptCopy(chat) {
@@ -858,21 +907,22 @@ async function __runPostDefaultMultiStage(stmBase, thinking_raw, assistantIndex)
     const previousSummary = getLongTermSummary();
     /*applyReplaceInPlace(stmBase, /<thinking_instructions>[\s\S]*?<\/thinking_instructions>/gi, '');*/
 
-    const expand = (tpl, ctx = {}) => {
-        const map = {
-            narration: ctx.narration ?? '',
-            thinking: ctx.thinking ?? '',
-            main: ctx.main ?? '',
-            previous_summary: ctx.previous_summary ?? '',
-            summary: ctx.summary ?? ''
-        };
+    //const expand = (tpl, ctx = {}) => {
+    //    const map = {
+    //        narration: ctx.narration ?? '',
+    //        thinking: ctx.thinking ?? '',
+    //        main: ctx.main ?? '',
+    //        previous_summary: ctx.previous_summary ?? '',
+    //        summary: ctx.summary ?? ''
+    //    };
 
-        return String(tpl ?? '').replace(/{{\s*([a-z_]+)\s*}}/gi, (_, key) => {
-            const k = key.toLowerCase();
-            return Object.prototype.hasOwnProperty.call(map, k) ? String(map[k]) : '';
-        });
-    };
-
+    //    return String(tpl ?? '').replace(/{{\s*([a-z_]+)\s*}}/gi, (_, key) => {
+    //        const k = key.toLowerCase();
+    //        return Object.prototype.hasOwnProperty.call(map, k) ? String(map[k]) : '';
+    //    });
+    //};
+    // --- in __runPostDefaultMultiStage, replace local expand ---
+    const expand = (tpl, ctx) => __expandTemplateMacros(tpl, ctx);
     // NEW: cap retries via setting (default 1 to prevent 3-4 extra calls)
     const maxAttemptsSetting = 5;
 
@@ -946,7 +996,7 @@ async function __runPostDefaultMultiStage(stmBase, thinking_raw, assistantIndex)
             'narration_instructions',
             'summary_instructions'
         ]);
-        mainPromptA.push({ role: 'system', content: `<main_instructions>\n${mainPrompt}\n</main_instructions>` });
+        mainPromptA.push({ role: 'system', content: __wrapInstructionTag('main_instructions', mainPrompt) });
 
         //applyReplaceInPlace(mainPromptA, /<_beat>[\s\S]*?<\/_beat>/gi, '');
         const { text } = await callStageWithRetry('main', mainPromptA, 'main');
@@ -974,7 +1024,7 @@ async function __runPostDefaultMultiStage(stmBase, thinking_raw, assistantIndex)
             'narration_instructions',
             'summary_instructions'
         ]);
-        narrationPromptA.push({ role: 'system', content: `<narration_instructions>\n${narrationPrompt}\n</narration_instructions>` });
+        narrationPromptA.push({ role: 'system', content: __wrapInstructionTag('narration_instructions', narrationPrompt) });
 
         applyReplaceInPlace(narrationPromptA, /<_sexd>[\s\S]*?<\/_sexd>/gi, '');
         const { text } = await callStageWithRetry('narration', narrationPromptA, 'narration');
@@ -1009,8 +1059,7 @@ async function __runPostDefaultMultiStage(stmBase, thinking_raw, assistantIndex)
             'narration_instructions',
             'summary_instructions'
         ]);
-        summaryPromptA.push({ role: 'system', content: `<summary_instructions>\n${summaryPrompt}\n</summary_instructions>` });
-
+        summaryPromptA.push({ role: 'system', content: __wrapInstructionTag('summary_instructions', summaryPrompt) });
         applyReplaceInPlace(summaryPromptA, /<_beat>[\s\S]*?<\/_beat>/gi, '');
         applyReplaceInPlace(summaryPromptA, /<_sexd>[\s\S]*?<\/_sexd>/gi, '');
         applyReplaceInPlace(summaryPromptA, /<_sex>[\s\S]*?<\/_sex>/gi, '');
@@ -2001,10 +2050,10 @@ function initThinkingData(eventData) {
         }
         if (thinkingTpl) {
             let thinkingPrompt = [
-                `<previous_thoughts>\n${previousCombined || '(none)'}\n</previous_thoughts>`,
+                __wrapInstructionTag('previous_thoughts', previousCombined || '(none)'),
                 thinkingTpl
             ].filter(Boolean).join('\n\n');
-            thinkingTpl = __applyNameMacros(thinkingPrompt); 
+            thinkingTpl = __applyNameMacros(thinkingPrompt);
         }
         return thinkingTpl;
     } catch (error) {
