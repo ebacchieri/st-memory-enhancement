@@ -858,12 +858,20 @@ async function __runPostDefaultMultiStage(stmBase, thinking_raw, assistantIndex)
     const previousSummary = getLongTermSummary();
     /*applyReplaceInPlace(stmBase, /<thinking_instructions>[\s\S]*?<\/thinking_instructions>/gi, '');*/
 
-    const expand = (tpl, ctx) => (tpl || '')
-        .replace(/{{narration}}/g, ctx.narration || '')
-        .replace(/{{thinking}}/g, ctx.thinking || '')
-        .replace(/{{main}}/g, ctx.main || '')
-        .replace(/{{previous_summary}}/g, ctx.previous_summary || '')
-        .replace(/{{summary}}/g, ctx.summary || '');
+    const expand = (tpl, ctx = {}) => {
+        const map = {
+            narration: ctx.narration ?? '',
+            thinking: ctx.thinking ?? '',
+            main: ctx.main ?? '',
+            previous_summary: ctx.previous_summary ?? '',
+            summary: ctx.summary ?? ''
+        };
+
+        return String(tpl ?? '').replace(/{{\s*([a-z_]+)\s*}}/gi, (_, key) => {
+            const k = key.toLowerCase();
+            return Object.prototype.hasOwnProperty.call(map, k) ? String(map[k]) : '';
+        });
+    };
 
     // NEW: cap retries via setting (default 1 to prevent 3-4 extra calls)
     const maxAttemptsSetting = 5;
