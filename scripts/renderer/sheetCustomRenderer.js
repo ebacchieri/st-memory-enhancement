@@ -216,7 +216,7 @@ function getLastPlot() {
     for (let i = chat.length - 1; i >= 0; i--) {
         if (chat[i].mes != "" && chat[i].is_user == false) {
             const regex1 = "<thinking>[\\s\\S]*?<\/thinking>";
-            const regex2 = "临时停用<tableEdit>[\\s\\S]*?<\/tableEdit>";  //暂时不正则掉tableEdit内容看看效果
+            const regex2 = "临时停用<tableedit>[\\s\\S]*?<\/tableedit>";  //暂时不正则掉tableEdit内容看看效果
             const regex = new RegExp(`${regex1}|${regex2}`, "g")
             return chat[i].mes.replace(regex, '');
         }

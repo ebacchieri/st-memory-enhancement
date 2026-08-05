@@ -49,8 +49,8 @@ function getStore() {
 // Strip sections that must not be embedded from chat messages
 function stripPrivateBlocks(text) {
     if (typeof text !== 'string' || !text) return '';
-    // Remove entire <critical_thinking>...</critical_thinking> blocks
-    text = text.replace(/<critical_thinking>[\s\S]*?<\/critical_thinking>/gi, '');
+    // Remove entire <criticalthinking>...</criticalthinking> blocks
+    text = text.replace(/<criticalthinking>[\s\S]*?<\/criticalthinking>/gi, '');
     // Remove entire <infoblock>...</infoblock> blocks
     text = text.replace(/<infoblock>[\s\S]*?<\/infoblock>/gi, '');
     return text;

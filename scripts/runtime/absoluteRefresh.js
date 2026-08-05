@@ -815,7 +815,7 @@ async function getRecentChatHistory(chat, chatStairs, ignoreUserSent = false, to
     for (let i = filteredChat.length - 1; i >= 0; i--) {
         // 格式化消息并清理标签
         const currentStr = `${filteredChat[i].name}: ${filteredChat[i].mes}`
-            .replace(/<tableEdit>[\s\S]*?<\/tableEdit>/g, '');
+            .replace(/<tableedit>[\s\S]*?<\/tableedit>/g, '');
 
         // 计算Token
         const tokens = await estimateTokenCount(currentStr);
@@ -1196,7 +1196,7 @@ export async function executeIncrementalUpdateFromSummary(
         const { matches } = getTableEditTag(rawContent);
 
         if (!matches || matches.length === 0) {
-            EDITOR.info("AI未返回任何有效的<tableEdit>操作指令，表格内容未发生变化。");
+            EDITOR.info("AI未返回任何有效的<tableedit>操作指令，表格内容未发生变化。");
             return 'success';
         }
 

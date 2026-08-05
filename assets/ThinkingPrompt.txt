@@ -1,6 +1,6 @@
 <private_reasoning>
 [OOC: Start your every response with Critical Thinking section, include following:
-<critical_thinking>
+<criticalthinking>
 ```
 [**CRITICAL THINKING SEQUENCE - {{char}} ONLY**]
 Pause your roleplay. Write {{char}}'s thoughts only using following instructions:
@@ -70,13 +70,13 @@ Long-Term Plan:
 
 
 ```
-</critical_thinking>
+</criticalthinking>
 
 
 Cognition simulation is now finished. 
 <priority>
  <rule>
-When reasoning about what {{char}} will do and describing actions of {{char}} use created <critical_thinking> sequence as persistant guideline, it's the core driver behind their actions. Persist trends across turns, keep {{char}}'s cognition logical and consistent, but also keep {{char}}'s thoughts open for {{user}} to influence them through providing new facts/ideas/perspectives or through masterful persuasion/seduction/intimidation if deemed necessary.
+When reasoning about what {{char}} will do and describing actions of {{char}} use created <criticalthinking> sequence as persistant guideline, it's the core driver behind their actions. Persist trends across turns, keep {{char}}'s cognition logical and consistent, but also keep {{char}}'s thoughts open for {{user}} to influence them through providing new facts/ideas/perspectives or through masterful persuasion/seduction/intimidation if deemed necessary.
 </rule>
 </priority>
 ]

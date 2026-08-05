@@ -465,7 +465,7 @@ function getLatestChatHistory(chat, deep) {
     for (let i = 0; i < Math.min(deep, floors); i++) {
         // 格式化消息并清理标签
         const currentStr = `${filteredChat[floors - i - 1].mes}`
-            .replace(/<tableEdit>[\s\S]*?<\/tableEdit>/g, '');
+            .replace(/<tableedit>[\s\S]*?<\/tableedit>/g, '');
         collected += currentStr;
     }
     return collected;

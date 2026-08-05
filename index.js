@@ -86,7 +86,7 @@ function __normalizeMessageIndex(arg) {
 function __stripCriticalAndInfoBlocks(text) {
     if (typeof text !== 'string' || !text) return '';
     return text
-        .replace(/<critical_thinking>[\s\S]*?<\/critical_thinking>/gi, '')
+        .replace(/<criticalthinking>[\s\S]*?<\/criticalthinking>/gi, '')
         .replace(/<infoblock>[\s\S]*?<\/infoblock>/gi, '');
 }
 // Place near other helpers
@@ -121,10 +121,10 @@ function __sanitizeDeepSeekOutput(raw, stage /* 'narration' | 'thinking' | 'main
 }
 // === NEW: Long-term summary branch store ==============================
 const LT_SUMMARY_STORE_KEY = 'long_term_summary_store_v1';
-// Helper: strip any <tableEdit>...</tableEdit> blocks (used by summary stage to avoid duplicate rows)
+// Helper: strip any <tableedit>...</tableedit> blocks (used by summary stage to avoid duplicate rows)
 function __stripTableEditBlocks(text) {
     if (typeof text !== 'string') return text;
-    return text.replace(/<tableEdit>[\s\S]*?<\/tableEdit>/gi, '');
+    return text.replace(/<tableedit>[\s\S]*?<\/tableedit>/gi, '');
 }
 function __getSummaryStore() {
     const ctx = USER.getContext();
@@ -562,7 +562,7 @@ function appendBlockToAssistant(msgIndex, blockLabel, content, opts = {}) {
     }
 
     // Table edit trigger
-    if (opts.triggerTableEdit === true && S.isAiWriteTable && /<tableEdit>/.test(updated)) {
+    if (opts.triggerTableEdit === true && S.isAiWriteTable && /<tableedit>/.test(updated)) {
         try { handleEditStrInMessage(msg, msgIndex, true); } catch (e) { console.warn('[MultiStage] table edit parse failed:', e); }
     }
 
@@ -654,7 +654,7 @@ function __buildStmBase(eventData, promptContent, thinkingContent, stm) {
     const stripReasoning = (text) => {
         if (typeof text !== 'string') return '';
         if (S.keep_reasoning_in_stmBase === true) return text;
-        return text.replace(/<critical_thinking>[\s\S]*?<\/critical_thinking>/gi, '');
+        return text.replace(/<criticalthinking>[\s\S]*?<\/criticalthinking>/gi, '');
     };
 
     const lines = [];
@@ -805,11 +805,11 @@ function __applyThinkingInjection(eventData) {
             if (eventData.chat[i]?.role === 'user') { lastUserIdx = i; break; }
         }
 
-        const wrapped = __wrapInstructionTag('thinking_instructions', thinkingContent.trim());
+        const wrapped = __wrapInstructionTag('thinkinginstructions', thinkingContent.trim());
 
         if (lastUserIdx !== -1) {
             const prev = eventData.chat[lastUserIdx].content || '';
-            const prevClean = __stripTagBlocksFromText(prev, 'thinking_instructions');
+            const prevClean = __stripTagBlocksFromText(prev, __STAGE_INSTRUCTION_TAGS);
             eventData.chat[lastUserIdx].content = `${wrapped}\n\n${prevClean}`;
         } else {
             const role = getMesRole() || 'system';
@@ -820,10 +820,10 @@ function __applyThinkingInjection(eventData) {
     }
 }
 const __STAGE_INSTRUCTION_TAGS = Object.freeze([
-    'thinking_instructions',
-    'main_instructions',
-    'narration_instructions',
-    'summary_instructions',
+    'thinkinginstructions',
+    'maininstructions',
+    'narrationinstructions',
+    'summaryinstructions',
 ]);
 
 function __escapeRegex(text) {
@@ -887,7 +887,7 @@ function __stripTagBlocksFromText(text, tags) {
 
     // 3) Orphan tag cleanup
     out = out.replace(
-        /<\/?\s*(thinking_instructions|main_instructions|narration_instructions|summary_instructions)\b[^>]*>/gi,
+        /<\/?\s*(thinkinginstructions|maininstructions|narrationinstructions|summaryinstructions)\b[^>]*>/gi,
         ''
     );
 
@@ -973,7 +973,6 @@ async function __runPostDefaultMultiStage(stmBase, thinking_raw, assistantIndex)
 
     // IMPORTANT: remove echoed instruction blocks from default output before reuse
     let thinking_content = __stripTagBlocksFromText(text || '', __STAGE_INSTRUCTION_TAGS).trim();
-    thinking_content = '';
     const previousSummary = getLongTermSummary();
     const expand = (tpl, ctx) => __expandTemplateMacros(tpl, ctx);
     const maxAttemptsSetting = 5;
@@ -1043,7 +1042,7 @@ async function __runPostDefaultMultiStage(stmBase, thinking_raw, assistantIndex)
         mainPrompt = __stripBlocksInPlace(mainPrompt, __STAGE_INSTRUCTION_TAGS);
         let mainPromptA = __promptCopy(__promptBaseForStage(stmBase));
         mainPromptA = __stripBlocksInPlace(mainPromptA, __STAGE_INSTRUCTION_TAGS);
-        mainPromptA.push({ role: 'system', content: __wrapInstructionTag('main_instructions', mainPrompt) });
+        mainPromptA.push({ role: 'system', content: __wrapInstructionTag('maininstructions', mainPrompt) });
 
         //applyReplaceInPlace(mainPromptA, /<_beat>[\s\S]*?<\/_beat>/gi, '');
         // MAIN stage: sanitize returned content before reusing in later stages
@@ -1068,7 +1067,7 @@ async function __runPostDefaultMultiStage(stmBase, thinking_raw, assistantIndex)
 
         let narrationPromptA = __promptCopy(__promptBaseForStage(stmBase));
         narrationPromptA = __stripBlocksInPlace(narrationPromptA, __STAGE_INSTRUCTION_TAGS);
-        narrationPromptA.push({ role: 'system', content: __wrapInstructionTag('narration_instructions', narrationPrompt) });
+        narrationPromptA.push({ role: 'system', content: __wrapInstructionTag('narrationinstructions', narrationPrompt) });
 
         applyReplaceInPlace(narrationPromptA, /<_sexd>[\s\S]*?<\/_sexd>/gi, '');
         // NARRATION stage: sanitize returned content before summary stage
@@ -1101,7 +1100,7 @@ async function __runPostDefaultMultiStage(stmBase, thinking_raw, assistantIndex)
         let summaryPromptA = __promptCopy(__promptBaseForStage(stmBase));
         summaryPromptA = __stripBlocksInPlace(summaryPromptA, __STAGE_INSTRUCTION_TAGS);
 
-        summaryPromptA.push({ role: 'system', content: __wrapInstructionTag('summary_instructions', summaryPrompt) });
+        summaryPromptA.push({ role: 'system', content: __wrapInstructionTag('summaryinstructions', summaryPrompt) });
         applyReplaceInPlace(summaryPromptA, /<_sexd>[\s\S]*?<\/_sexd>/gi, '');
         applyReplaceInPlace(summaryPromptA, /<_sex>[\s\S]*?<\/_sex>/gi, '');
 
@@ -1723,16 +1722,16 @@ export function getTableEditActionsStr() {
 }
 
 export function replaceTableEditTag(chat, newContent) {
-    if (/<tableEdit>.*?<\/tableEdit>/gs.test(chat.mes)) {
-        chat.mes = chat.mes.replace(/<tableEdit>(.*?)<\/tableEdit>/gs, `<tableEdit>${newContent}</tableEdit>`);
+    if (/<tableedit>.*?<\/tableedit>/gs.test(chat.mes)) {
+        chat.mes = chat.mes.replace(/<tableedit>(.*?)<\/tableedit>/gs, `<tableedit>${newContent}</tableedit>`);
     } else {
-        chat.mes += `\n<tableEdit>${newContent}</tableEdit>`;
+        chat.mes += `\n<tableedit>${newContent}</tableedit>`;
     }
     if (chat.swipes != null && chat.swipe_id != null)
-        if (/<tableEdit>.*?<\/tableEdit>/gs.test(chat.swipes[chat.swipe_id])) {
-            chat.swipes[chat.swipe_id] = chat.swipes[chat.swipe_id].replace(/<tableEdit>(.*?)<\/tableEdit>/gs, `<tableEdit>\n${newContent}\n</tableEdit>`);
+        if (/<tableedit>.*?<\/tableedit>/gs.test(chat.swipes[chat.swipe_id])) {
+            chat.swipes[chat.swipe_id] = chat.swipes[chat.swipe_id].replace(/<tableedit>(.*?)<\/tableedit>/gs, `<tableedit>\n${newContent}\n</tableedit>`);
         } else {
-            chat.swipes[chat.swipe_id] += `\n<tableEdit>${newContent}</tableEdit>`;
+            chat.swipes[chat.swipe_id] += `\n<tableedit>${newContent}</tableedit>`;
         }
     USER.getContext().saveChat();
 }
@@ -1755,7 +1754,7 @@ function getMesRole() {
 
 function __stripCriticalThinkingBlocks(text) {
     if (typeof text !== 'string') return text;
-    return text.replace(/<critical_thinking>[\s\S]*?<\/critical_thinking>/gi, '').trim();
+    return text.replace(/<criticalthinking>[\s\S]*?<\/criticalthinking>/gi, '').trim();
 }
 
 function __collectLastCriticalThinkingSections(chatArr, count) {
@@ -1768,7 +1767,7 @@ function __collectLastCriticalThinkingSections(chatArr, count) {
             ? c.content
             : (typeof c.mes === 'string' ? c.mes : '');
         if (!body) continue;
-        const matches = body.match(/<critical_thinking>[\s\S]*?<\/critical_thinking>/gi);
+        const matches = body.match(/<criticalthinking>[\s\S]*?<\/criticalthinking>/gi);
         if (matches) {
             for (let j = matches.length - 1; j >= 0 && collected.length < count; j--) {
                 collected.push(matches[j]);
@@ -1782,7 +1781,7 @@ function __buildThinkingPromptOverride(latestSection) {
     try {
         let tpl = USER.tableBaseSetting?.thinking_template || '';
         if (!tpl || typeof tpl !== 'string') return '';
-        const replaced = tpl.replace('<previous_thinking>', latestSection || '');
+        const replaced = tpl.replace('<previousthinking>', latestSection || '');
         return replaceUserTag(replaced);
     } catch (e) {
         EDITOR.error('思考提示词构建失败', e.message, e);
@@ -1903,7 +1902,7 @@ async function onChatCompletionPromptReady(eventData) {
             if (eventData.chat[i]?.role === 'user') { lastUserIdx = i; break; }
         }
         if (lastUserIdx !== -1) {
-            let lastContent = eventData.chat[lastUserIdx].content.replace(/<previous_message>/g, '').replace(/<\/previous_message>/g, '');
+            let lastContent = eventData.chat[lastUserIdx].content.replace(/<previous_message>/gi, '').replace(/<\/previous_message>/gi, '');
             lastContent = `<last_user_message>\n${lastContent}\n</last_user_message>`;
             stmBase[lastUserIdx].content = lastContent;
         }
@@ -2036,7 +2035,7 @@ function trimString(str) {
 }
 
 export function getTableEditTag(mes) {
-    const regex = /<tableEdit>(.*?)<\/tableEdit>/gs;
+    const regex = /<tableedit>(.*?)<\/tableedit>/gs;
     const matches = [];
     let match;
     while ((match = regex.exec(mes)) !== null) {
@@ -2052,12 +2051,12 @@ function getLatestAssistantCriticalThinkingSection() {
         for (let i = chat.length - 1; i >= 0; i--) {
             const c = chat[i];
             if (c && c.is_user === false && typeof c.mes === 'string') {
-                const match = c.mes.match(/<critical_thinking>[\s\S]*?<\/critical_thinking>/i);
+                const match = c.mes.match(/<criticalthinking>[\s\S]*?<\/criticalthinking>/i);
                 if (match && match[0]) return match[0];
             }
         }
     } catch (e) {
-        console.error('Failed to extract latest <critical_thinking> section:', e);
+        console.error('Failed to extract latest <criticalthinking> section:', e);
     }
     return '';
 }
