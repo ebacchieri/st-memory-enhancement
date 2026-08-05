@@ -721,23 +721,6 @@ function __toGlobalRegex(regexOrText) {
     return new RegExp(__escapeRegex(String(regexOrText)), 'g');
 }
 
-function __buildTagBlockRegex(tagName) {
-    const t = __escapeRegex(String(tagName || '').trim());
-    // supports case differences + optional spaces around tag name and slash
-    return new RegExp(`<\\s*${t}\\s*>[\\s\\S]*?<\\s*\\/\\s*${t}\\s*>`, 'gi');
-}
-
-function __stripTagBlocksFromText(text, tags) {
-    if (typeof text !== 'string' || !text) return text;
-    const list = Array.isArray(tags) ? tags : [tags];
-    let out = text;
-    list.forEach(tag => {
-        if (!tag) return;
-        out = out.replace(__buildTagBlockRegex(tag), '');
-    });
-    return out;
-}
-
 function __wrapInstructionTag(tagName, content) {
     const tag = String(tagName || '').trim();
     const bodyRaw = String(content ?? '');
