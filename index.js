@@ -848,33 +848,26 @@ function __stripTagBlocksFromText(text, tags) {
 
     if (!list.length) return text;
 
-    // 1) DOM-based pass
+    let out = text;
+
+    // 1) DOM pass (no early return)
     try {
         const parser = new DOMParser();
-        const doc = parser.parseFromString(`<div id="__root__">${text}</div>`, 'text/html');
+        const doc = parser.parseFromString(`<div id="__root__">${out}</div>`, 'text/html');
         const root = doc.getElementById('__root__');
 
         if (root) {
-            let removed = 0;
             list.forEach(tag => {
-                const nodes = root.querySelectorAll(tag);
-                removed += nodes.length;
-                nodes.forEach(node => node.remove());
+                root.querySelectorAll(tag).forEach(node => node.remove());
             });
-
-            // Only return DOM result if something was actually removed
-            if (removed > 0) {
-                return root.innerHTML;
-            }
+            out = root.innerHTML;
         }
     } catch {
-        // continue to regex fallback
+        // keep original `out`
     }
 
-    // 2) Regex fallback (raw + escaped tags, iterative)
-    let out = text;
+    // 2) Regex pass (always run)
     const escapeRegex = s => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
     for (let pass = 0; pass < 20; pass++) {
         let changed = false;
         for (const tag of list) {
@@ -891,6 +884,12 @@ function __stripTagBlocksFromText(text, tags) {
         }
         if (!changed) break;
     }
+
+    // 3) Orphan tag cleanup
+    out = out.replace(
+        /<\/?\s*(thinking_instructions|main_instructions|narration_instructions|summary_instructions)\b[^>]*>/gi,
+        ''
+    );
 
     return out;
 }
@@ -923,7 +922,7 @@ function __stripBlocksInPlace(messages, tags) {
 function __wrapInstructionTag(tagName, content) {
     const tag = String(tagName || '').trim();
     const bodyRaw = String(content ?? '');
-    const body = __stripTagBlocksFromText(bodyRaw, tag).trim();
+    const body = __stripTagBlocksFromText(bodyRaw, __STAGE_INSTRUCTION_TAGS).trim();
     return `<${tag}>\n${body}\n</${tag}>`;
 }
 
