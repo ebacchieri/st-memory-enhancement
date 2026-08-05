@@ -922,14 +922,14 @@ function __stripBlocksInPlace(messages, tags) {
 function __wrapInstructionTag(tagName, content) {
     const tag = String(tagName || '').trim();
     const bodyRaw = String(content ?? '');
-    const body = __stripTagBlocksFromText(bodyRaw, __STAGE_INSTRUCTION_TAGS).trim();
-    return `<${tag}>\n${body}\n</${tag}>`;
+    //const body = __stripTagBlocksFromText(bodyRaw, __STAGE_INSTRUCTION_TAGS).trim();
+    return `<${tag}>\n${bodyRaw}\n</${tag}>`;
 }
 
-function __promptBaseForStage(stmBase) {
-    const copy = Array.isArray(stmBase)
-        ? __toPromptChat(stmBase)
-        : (typeof stmBase === 'string' ? [{ role: 'system', content: stmBase }] : []);
+function __promptBaseForStage(stmBase2) {
+    const copy = Array.isArray(stmBase2)
+        ? __toPromptChat(stmBase2)
+        : (typeof stmBase2 === 'string' ? [{ role: 'system', content: stmBase2 }] : []);
 
     let copy2 = __stripBlocksInPlace(copy, __STAGE_INSTRUCTION_TAGS);
     return copy2;
@@ -964,7 +964,6 @@ async function __runPostDefaultMultiStage(stmBase, thinking_raw, assistantIndex)
     const enableNarration = S.enable_narration_stage !== false;
     const enableMain = S.enable_main_stage !== false;
     const enableSummary = S.enable_long_term_summary_stage !== false;
-
     let narrationTpl = enableNarration ? (S.narration_template || '').trim() : '';
     let mainTpl = enableMain ? (S.main_response_template || '').trim() : '';
     let longTermSummaryTpl = enableSummary ? (S.long_term_summary_template || '').trim() : '';
@@ -1895,15 +1894,15 @@ async function onChatCompletionPromptReady(eventData) {
         __applyThinkingInjection(eventData);     
         
         stmBase.forEach(m => {
-            if (typeof m.content === 'string') m.content = `<previous_message>\n${m.content}\n</previous_message>`;
+            if (typeof m.content === 'string') m.content = `<previousmessage>\n${m.content}\n</previousmessage>`;
         });
         let lastUserIdx = -1;
         for (let i = eventData.chat.length - 1; i >= 0; i--) {
             if (eventData.chat[i]?.role === 'user') { lastUserIdx = i; break; }
         }
         if (lastUserIdx !== -1) {
-            let lastContent = eventData.chat[lastUserIdx].content.replace(/<previous_message>/gi, '').replace(/<\/previous_message>/gi, '');
-            lastContent = `<last_user_message>\n${lastContent}\n</last_user_message>`;
+            let lastContent = eventData.chat[lastUserIdx].content.replace(/<previousmessage>/gi, '').replace(/<\/previousmessage>/gi, '');
+            lastContent = `<lastusermessage>\n${lastContent}\n</lastusermessage>`;
             stmBase[lastUserIdx].content = lastContent;
         }
         window.__stm_ms_state.pendingMultiStage = { stmBase, ts: Date.now() };
@@ -2090,7 +2089,7 @@ function initThinkingData(eventData) {
         }
         if (thinkingTpl) {
             let thinkingPrompt = [
-                __wrapInstructionTag('previous_thoughts', previousCombined || '(none)'),
+                __wrapInstructionTag('previousthoughts', previousCombined || '(none)'),
                 thinkingTpl
             ].filter(Boolean).join('\n\n');
             thinkingTpl = __applyNameMacros(thinkingPrompt);
