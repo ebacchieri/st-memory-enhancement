@@ -1020,7 +1020,7 @@ async function __runPostDefaultMultiStage(stmBase, thinking_raw, assistantIndex)
             }
             if (attempt < maxAttempts) {
                 console.warn(`[PostMultiStage:${stageName}] Empty/failed response (attempt ${attempt}); retrying...`);
-                await new Promise(r => setTimeout(r, 2000 * attempt));
+                await new Promise(r => setTimeout(r, 6000 * attempt));
             } else {
                 console.error(`[PostMultiStage:${stageName}] Failed after ${maxAttempts} attempts; giving up.`);
             }
