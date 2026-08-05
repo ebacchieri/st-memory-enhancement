@@ -710,10 +710,6 @@ const replaceInMessages = (msgs, regex, replacement = '') =>
         content: typeof m.content === 'string' ? m.content.replace(regex, replacement) : m.content
     }));
 
-// --- add near other helpers (before applyReplaceInPlace / __stripBlocksInPlace) ---
-function __escapeRegex(text) {
-    return String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
 
 function __toGlobalRegex(regexOrText) {
     if (regexOrText instanceof RegExp) {
