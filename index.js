@@ -1041,7 +1041,7 @@ async function __runPostDefaultMultiStage(stmBase, thinking_raw, assistantIndex)
             })
         ].filter(Boolean).join('\n\n');
         mainPrompt = __applyNameMacros(mainPrompt);
-
+        mainPrompt = __stripBlocksInPlace(mainPrompt, __STAGE_INSTRUCTION_TAGS);
         let mainPromptA = __promptCopy(__promptBaseForStage(stmBase));
         mainPromptA = __stripBlocksInPlace(mainPromptA, __STAGE_INSTRUCTION_TAGS);
         mainPromptA.push({ role: 'system', content: __wrapInstructionTag('main_instructions', mainPrompt) });
@@ -1065,6 +1065,7 @@ async function __runPostDefaultMultiStage(stmBase, thinking_raw, assistantIndex)
             })
         ].filter(Boolean).join('\n\n');
         narrationPrompt = __applyNameMacros(narrationPrompt);
+        narrationPrompt = __stripBlocksInPlace(narrationPrompt, __STAGE_INSTRUCTION_TAGS);
 
         let narrationPromptA = __promptCopy(__promptBaseForStage(stmBase));
         narrationPromptA = __stripBlocksInPlace(narrationPromptA, __STAGE_INSTRUCTION_TAGS);
@@ -1096,6 +1097,7 @@ async function __runPostDefaultMultiStage(stmBase, thinking_raw, assistantIndex)
             })
         ].filter(Boolean).join('\n\n');
         summaryPrompt = __applyNameMacros(summaryPrompt);
+        summaryPrompt = __stripBlocksInPlace(summaryPrompt, __STAGE_INSTRUCTION_TAGS);
 
         let summaryPromptA = __promptCopy(__promptBaseForStage(stmBase));
         summaryPromptA = __stripBlocksInPlace(summaryPromptA, __STAGE_INSTRUCTION_TAGS);
