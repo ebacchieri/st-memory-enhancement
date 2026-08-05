@@ -932,8 +932,8 @@ function __promptBaseForStage(stmBase) {
         ? __toPromptChat(stmBase)
         : (typeof stmBase === 'string' ? [{ role: 'system', content: stmBase }] : []);
 
-    __stripBlocksInPlace(copy, __STAGE_INSTRUCTION_TAGS);
-    return copy;
+    let copy2 = __stripBlocksInPlace(copy, __STAGE_INSTRUCTION_TAGS);
+    return copy2;
 }
 
 // Strict prompt copy: only role + string content, no shared references
@@ -1043,7 +1043,7 @@ async function __runPostDefaultMultiStage(stmBase, thinking_raw, assistantIndex)
         mainPrompt = __applyNameMacros(mainPrompt);
 
         let mainPromptA = __promptCopy(__promptBaseForStage(stmBase));
-        __stripBlocksInPlace(mainPromptA, __STAGE_INSTRUCTION_TAGS);
+        mainPromptA = __stripBlocksInPlace(mainPromptA, __STAGE_INSTRUCTION_TAGS);
         mainPromptA.push({ role: 'system', content: __wrapInstructionTag('main_instructions', mainPrompt) });
 
         //applyReplaceInPlace(mainPromptA, /<_beat>[\s\S]*?<\/_beat>/gi, '');
@@ -1067,7 +1067,7 @@ async function __runPostDefaultMultiStage(stmBase, thinking_raw, assistantIndex)
         narrationPrompt = __applyNameMacros(narrationPrompt);
 
         let narrationPromptA = __promptCopy(__promptBaseForStage(stmBase));
-        __stripBlocksInPlace(narrationPromptA, __STAGE_INSTRUCTION_TAGS);
+        narrationPromptA = __stripBlocksInPlace(narrationPromptA, __STAGE_INSTRUCTION_TAGS);
         narrationPromptA.push({ role: 'system', content: __wrapInstructionTag('narration_instructions', narrationPrompt) });
 
         applyReplaceInPlace(narrationPromptA, /<_sexd>[\s\S]*?<\/_sexd>/gi, '');
@@ -1098,7 +1098,7 @@ async function __runPostDefaultMultiStage(stmBase, thinking_raw, assistantIndex)
         summaryPrompt = __applyNameMacros(summaryPrompt);
 
         let summaryPromptA = __promptCopy(__promptBaseForStage(stmBase));
-        __stripBlocksInPlace(summaryPromptA, __STAGE_INSTRUCTION_TAGS);
+        summaryPromptA = __stripBlocksInPlace(summaryPromptA, __STAGE_INSTRUCTION_TAGS);
 
         summaryPromptA.push({ role: 'system', content: __wrapInstructionTag('summary_instructions', summaryPrompt) });
         applyReplaceInPlace(summaryPromptA, /<_sexd>[\s\S]*?<\/_sexd>/gi, '');
