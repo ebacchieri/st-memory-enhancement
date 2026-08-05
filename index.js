@@ -827,8 +827,54 @@ function __applyThinkingInjection(eventData) {
         console.warn('[ThinkingInjection] Failed to inject thinking content:', e);
     }
 }
-// Remove all occurrences of specific XML-like blocks by tag names (no regex)
-// --- replace existing __stripBlocksInPlace ---
+const __STAGE_INSTRUCTION_TAGS = Object.freeze([
+    'thinking_instructions',
+    'main_instructions',
+    'narration_instructions',
+    'summary_instructions',
+]);
+
+function __escapeRegex(text) {
+    return String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function __buildTagBlockRegex(tagName) {
+    const t = __escapeRegex(String(tagName || '').trim());
+    // Matches:
+    // <tag>...</tag>
+    // < tag >...</ tag >
+    // <tag attr="x">...</tag>
+    return new RegExp(`<\\s*${t}\\b[^>]*>[\\s\\S]*?<\\s*\\/\\s*${t}\\s*>`, 'gi');
+}
+
+function __stripTagBlocksFromText(text, tags) {
+    if (typeof text !== 'string' || !text) return text;
+
+    const list = (Array.isArray(tags) ? tags : [tags])
+        .map(t => String(t || '').trim())
+        .filter(Boolean);
+
+    if (list.length === 0) return text;
+
+    let out = text;
+    let changed = true;
+
+    // Repeat to handle multiple and nested blocks safely
+    while (changed) {
+        changed = false;
+        for (const tag of list) {
+            const blockRx = __buildTagBlockRegex(tag);
+            const next = out.replace(blockRx, '');
+            if (next !== out) {
+                out = next;
+                changed = true;
+            }
+        }
+    }
+
+    return out;
+}
+
 function __stripBlocksInPlace(messages, tags) {
     if (!messages) return messages;
 
@@ -853,6 +899,20 @@ function __stripBlocksInPlace(messages, tags) {
 
     return messages;
 }
+
+function __wrapInstructionTag(tagName, content) {
+    const tag = String(tagName || '').trim();
+    const bodyRaw = String(content ?? '');
+    const body = __stripTagBlocksFromText(bodyRaw, tag).trim();
+    return `<${tag}>\n${body}\n</${tag}>`;
+}
+
+function __promptBaseForStage(stmBase) {
+    const copy = __toPromptChat(stmBase);
+    __stripBlocksInPlace(copy, __STAGE_INSTRUCTION_TAGS);
+    return copy;
+}
+
 // Strict prompt copy: only role + string content, no shared references
 function __promptCopy(chat) {
     if (!Array.isArray(chat)) return [];
@@ -874,23 +934,7 @@ function __toPromptChat(chat) {
         return { role, content: raw };
     });
 }
-// Return a cleaned copy of stmBase with stage-specific blocks removed
-function __promptBaseForStage(stmBase) {
-    const copy = __toPromptChat(stmBase);
-    const strip = [
-        /<thinking_instructions>[\s\S]*?<\/thinking_instructions>/gi,
-        /<main_instructions>[\s\S]*?<\/main_instructions>/gi,
-        /<narration_instructions>[\s\S]*?<\/narration_instructions>/gi,
-        /<summary_instructions>[\s\S]*?<\/summary_instructions>/gi
-        
-    ];
-    copy.forEach(m => {
-        if (typeof m.content === 'string') {
-            strip.forEach(rx => { m.content = m.content.replace(rx, ''); });
-        }
-    });
-    return copy;
-}
+
 
 // NEW: Post-default multi-stage runner that updates ONLY the last assistant message
 async function __runPostDefaultMultiStage(stmBase, thinking_raw, assistantIndex) {
@@ -990,12 +1034,6 @@ async function __runPostDefaultMultiStage(stmBase, thinking_raw, assistantIndex)
         mainPrompt = __applyNameMacros(mainPrompt);
 
         let mainPromptA = __promptCopy(__promptBaseForStage(stmBase));
-        __stripBlocksInPlace(mainPromptA, [
-            'thinking_instructions',
-            'main_instructions',
-            'narration_instructions',
-            'summary_instructions'
-        ]);
         mainPromptA.push({ role: 'system', content: __wrapInstructionTag('main_instructions', mainPrompt) });
 
         //applyReplaceInPlace(mainPromptA, /<_beat>[\s\S]*?<\/_beat>/gi, '');
@@ -1018,12 +1056,6 @@ async function __runPostDefaultMultiStage(stmBase, thinking_raw, assistantIndex)
         narrationPrompt = __applyNameMacros(narrationPrompt);
 
         let narrationPromptA = __promptCopy(__promptBaseForStage(stmBase));
-        __stripBlocksInPlace(narrationPromptA, [
-            'thinking_instructions',
-            'main_instructions',
-            'narration_instructions',
-            'summary_instructions'
-        ]);
         narrationPromptA.push({ role: 'system', content: __wrapInstructionTag('narration_instructions', narrationPrompt) });
 
         applyReplaceInPlace(narrationPromptA, /<_sexd>[\s\S]*?<\/_sexd>/gi, '');
@@ -1053,14 +1085,8 @@ async function __runPostDefaultMultiStage(stmBase, thinking_raw, assistantIndex)
         summaryPrompt = __applyNameMacros(summaryPrompt);
 
         let summaryPromptA = __promptCopy(__promptBaseForStage(stmBase));
-        __stripBlocksInPlace(summaryPromptA, [
-            'thinking_instructions',
-            'main_instructions',
-            'narration_instructions',
-            'summary_instructions'
-        ]);
-        summaryPromptA.push({ role: 'system', content: __wrapInstructionTag('summary_instructions', summaryPrompt) });
-        applyReplaceInPlace(summaryPromptA, /<_beat>[\s\S]*?<\/_beat>/gi, '');
+
+        summaryPromptA.push({ role: 'system', content: __wrapInstructionTag('summary_instructions', summaryPrompt) });        applyReplaceInPlace(summaryPromptA, /<_beat>[\s\S]*?<\/_beat>/gi, '');
         applyReplaceInPlace(summaryPromptA, /<_sexd>[\s\S]*?<\/_sexd>/gi, '');
         applyReplaceInPlace(summaryPromptA, /<_sex>[\s\S]*?<\/_sex>/gi, '');
 
