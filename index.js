@@ -774,23 +774,20 @@ function __applyThinkingInjection(eventData) {
         const thinkingTpl = enableThinking ? (S.thinking_template || '').trim() : '';
         if (!enableThinking || !thinkingTpl) return;
 
-        // Build thinking content (existing helper preserves previous thinking CRM)
         const thinkingContent = initThinkingData(eventData);
         if (!thinkingContent || !thinkingContent.trim()) return;
 
-        // Prefer prepending to last user message; fallback to insert as system
         let lastUserIdx = -1;
         for (let i = eventData.chat.length - 1; i >= 0; i--) {
             if (eventData.chat[i]?.role === 'user') { lastUserIdx = i; break; }
         }
-        //applyReplaceInPlace(eventData.chat, /<_beat>[\s\S]*?<\/_beat>/gi, '');
-        //applyReplaceInPlace(eventData.chat, /<_sexd>[\s\S]*?<\/_sexd>/gi, '');
-        //applyReplaceInPlace(eventData.chat, /<_sex>[\s\S]*?<\/_sex>/gi, '');
-        // --- in __applyThinkingInjection ---
+
         const wrapped = __wrapInstructionTag('thinking_instructions', thinkingContent.trim());
+
         if (lastUserIdx !== -1) {
             const prev = eventData.chat[lastUserIdx].content || '';
-            eventData.chat[lastUserIdx].content = `${wrapped}\n\n${prev}`;
+            const prevClean = __stripTagBlocksFromText(prev, 'thinking_instructions');
+            eventData.chat[lastUserIdx].content = `${wrapped}\n\n${prevClean}`;
         } else {
             const role = getMesRole() || 'system';
             eventData.chat.push({ role, content: wrapped });
@@ -823,25 +820,53 @@ function __stripTagBlocksFromText(text, tags) {
     if (typeof text !== 'string' || !text) return text;
 
     const list = (Array.isArray(tags) ? tags : [tags])
-        .map(t => String(t || '').trim())
+        .map(t => String(t || '').trim().toLowerCase())
         .filter(Boolean);
 
-    if (list.length === 0) return text;
+    if (!list.length) return text;
 
+    // 1) DOM-based pass
+    try {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(`<div id="__root__">${text}</div>`, 'text/html');
+        const root = doc.getElementById('__root__');
+
+        if (root) {
+            let removed = 0;
+            list.forEach(tag => {
+                const nodes = root.querySelectorAll(tag);
+                removed += nodes.length;
+                nodes.forEach(node => node.remove());
+            });
+
+            // Only return DOM result if something was actually removed
+            if (removed > 0) {
+                return root.innerHTML;
+            }
+        }
+    } catch {
+        // continue to regex fallback
+    }
+
+    // 2) Regex fallback (raw + escaped tags, iterative)
     let out = text;
-    let changed = true;
+    const escapeRegex = s => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-    // Repeat to handle multiple and nested blocks safely
-    while (changed) {
-        changed = false;
+    for (let pass = 0; pass < 20; pass++) {
+        let changed = false;
         for (const tag of list) {
-            const blockRx = __buildTagBlockRegex(tag);
-            const next = out.replace(blockRx, '');
+            const t = escapeRegex(tag);
+            const rx = new RegExp(
+                `<\\s*${t}\\b[^>]*>[\\s\\S]*?<\\s*\\/\\s*${t}\\s*>|&lt;\\s*${t}\\b[^&]*&gt;[\\s\\S]*?&lt;\\s*\\/\\s*${t}\\s*&gt;`,
+                'gi'
+            );
+            const next = out.replace(rx, '');
             if (next !== out) {
                 out = next;
                 changed = true;
             }
         }
+        if (!changed) break;
     }
 
     return out;
@@ -880,7 +905,10 @@ function __wrapInstructionTag(tagName, content) {
 }
 
 function __promptBaseForStage(stmBase) {
-    const copy = __toPromptChat(stmBase);
+    const copy = Array.isArray(stmBase)
+        ? __toPromptChat(stmBase)
+        : (typeof stmBase === 'string' ? [{ role: 'system', content: stmBase }] : []);
+
     __stripBlocksInPlace(copy, __STAGE_INSTRUCTION_TAGS);
     return copy;
 }
@@ -1006,6 +1034,7 @@ async function __runPostDefaultMultiStage(stmBase, thinking_raw, assistantIndex)
         mainPrompt = __applyNameMacros(mainPrompt);
 
         let mainPromptA = __promptCopy(__promptBaseForStage(stmBase));
+        __stripBlocksInPlace(mainPromptA, __STAGE_INSTRUCTION_TAGS);
         mainPromptA.push({ role: 'system', content: __wrapInstructionTag('main_instructions', mainPrompt) });
 
         //applyReplaceInPlace(mainPromptA, /<_beat>[\s\S]*?<\/_beat>/gi, '');
@@ -1028,6 +1057,7 @@ async function __runPostDefaultMultiStage(stmBase, thinking_raw, assistantIndex)
         narrationPrompt = __applyNameMacros(narrationPrompt);
 
         let narrationPromptA = __promptCopy(__promptBaseForStage(stmBase));
+        __stripBlocksInPlace(narrationPromptA, __STAGE_INSTRUCTION_TAGS);
         narrationPromptA.push({ role: 'system', content: __wrapInstructionTag('narration_instructions', narrationPrompt) });
 
         applyReplaceInPlace(narrationPromptA, /<_sexd>[\s\S]*?<\/_sexd>/gi, '');
@@ -1057,8 +1087,9 @@ async function __runPostDefaultMultiStage(stmBase, thinking_raw, assistantIndex)
         summaryPrompt = __applyNameMacros(summaryPrompt);
 
         let summaryPromptA = __promptCopy(__promptBaseForStage(stmBase));
+        __stripBlocksInPlace(summaryPromptA, __STAGE_INSTRUCTION_TAGS);
 
-        summaryPromptA.push({ role: 'system', content: __wrapInstructionTag('summary_instructions', summaryPrompt) });        applyReplaceInPlace(summaryPromptA, /<_beat>[\s\S]*?<\/_beat>/gi, '');
+        summaryPromptA.push({ role: 'system', content: __wrapInstructionTag('summary_instructions', summaryPrompt) });
         applyReplaceInPlace(summaryPromptA, /<_sexd>[\s\S]*?<\/_sexd>/gi, '');
         applyReplaceInPlace(summaryPromptA, /<_sex>[\s\S]*?<\/_sex>/gi, '');
 
