@@ -738,31 +738,54 @@ function __expandTemplateMacros(tpl, ctx = {}) {
         return Object.prototype.hasOwnProperty.call(map, k) ? String(map[k]) : '';
     });
 }
-// --- replace existing applyReplaceInPlace ---
-const applyReplaceInPlace = (msgs, regexOrText, replacement = '') => {
-    const rx = __toGlobalRegex(regexOrText);
-    if (!msgs) return msgs;
+function __replaceInText(text, regexOrText, replacement = '') {
+    if (typeof text !== 'string' || !text) return text;
 
-    if (typeof msgs === 'string') {
-        return msgs.replace(rx, replacement);
+    let rx;
+    try {
+        rx = __toGlobalRegex(regexOrText);
+    } catch {
+        return text;
     }
 
-    if (Array.isArray(msgs)) {
-        msgs.forEach(m => {
+    const replacer = typeof replacement === 'function'
+        ? replacement
+        : String(replacement ?? '');
+
+    return text.replace(rx, replacer);
+}
+
+const applyReplaceInPlace = (target, regexOrText, replacement = '') => {
+    if (!target) return target;
+
+    if (typeof target === 'string') {
+        return __replaceInText(target, regexOrText, replacement);
+    }
+
+    if (Array.isArray(target)) {
+        target.forEach(m => {
             if (!m) return;
-            if (typeof m.content === 'string') m.content = m.content.replace(rx, replacement);
-            if (typeof m.mes === 'string') m.mes = m.mes.replace(rx, replacement);
+            if (typeof m.content === 'string') {
+                m.content = __replaceInText(m.content, regexOrText, replacement);
+            }
+            if (typeof m.mes === 'string') {
+                m.mes = __replaceInText(m.mes, regexOrText, replacement);
+            }
         });
-        return msgs;
+        return target;
     }
 
-    if (typeof msgs === 'object') {
-        if (typeof msgs.content === 'string') msgs.content = msgs.content.replace(rx, replacement);
-        if (typeof msgs.mes === 'string') msgs.mes = msgs.mes.replace(rx, replacement);
-        return msgs;
+    if (typeof target === 'object') {
+        if (typeof target.content === 'string') {
+            target.content = __replaceInText(target.content, regexOrText, replacement);
+        }
+        if (typeof target.mes === 'string') {
+            target.mes = __replaceInText(target.mes, regexOrText, replacement);
+        }
+        return target;
     }
 
-    return msgs;
+    return target;
 };
 
 
@@ -946,28 +969,14 @@ async function __runPostDefaultMultiStage(stmBase, thinking_raw, assistantIndex)
     let narrationTpl = enableNarration ? (S.narration_template || '').trim() : '';
     let mainTpl = enableMain ? (S.main_response_template || '').trim() : '';
     let longTermSummaryTpl = enableSummary ? (S.long_term_summary_template || '').trim() : '';
+
     const { text } = __sanitizeDeepSeekOutput(thinking_raw, 'thinking');
-    let thinking_content = text || '';  
+
+    // IMPORTANT: remove echoed instruction blocks from default output before reuse
+    let thinking_content = __stripTagBlocksFromText(text || '', __STAGE_INSTRUCTION_TAGS).trim();
+
     const previousSummary = getLongTermSummary();
-    /*applyReplaceInPlace(stmBase, /<thinking_instructions>[\s\S]*?<\/thinking_instructions>/gi, '');*/
-
-    //const expand = (tpl, ctx = {}) => {
-    //    const map = {
-    //        narration: ctx.narration ?? '',
-    //        thinking: ctx.thinking ?? '',
-    //        main: ctx.main ?? '',
-    //        previous_summary: ctx.previous_summary ?? '',
-    //        summary: ctx.summary ?? ''
-    //    };
-
-    //    return String(tpl ?? '').replace(/{{\s*([a-z_]+)\s*}}/gi, (_, key) => {
-    //        const k = key.toLowerCase();
-    //        return Object.prototype.hasOwnProperty.call(map, k) ? String(map[k]) : '';
-    //    });
-    //};
-    // --- in __runPostDefaultMultiStage, replace local expand ---
     const expand = (tpl, ctx) => __expandTemplateMacros(tpl, ctx);
-    // NEW: cap retries via setting (default 1 to prevent 3-4 extra calls)
     const maxAttemptsSetting = 5;
 
     async function callStage(messages) {
@@ -1038,8 +1047,9 @@ async function __runPostDefaultMultiStage(stmBase, thinking_raw, assistantIndex)
         mainPromptA.push({ role: 'system', content: __wrapInstructionTag('main_instructions', mainPrompt) });
 
         //applyReplaceInPlace(mainPromptA, /<_beat>[\s\S]*?<\/_beat>/gi, '');
-        const { text } = await callStageWithRetry('main', mainPromptA, 'main');
-        mainResp = text;
+        // MAIN stage: sanitize returned content before reusing in later stages
+        const { text: mainText } = await callStageWithRetry('main', mainPromptA, 'main');
+        mainResp = __stripTagBlocksFromText(mainText || '', __STAGE_INSTRUCTION_TAGS).trim();
         if (mainResp) {
             appendBlockToAssistant(assistantIndex, 'main', mainResp, { triggerTableEdit: true });
         }
@@ -1061,8 +1071,9 @@ async function __runPostDefaultMultiStage(stmBase, thinking_raw, assistantIndex)
         narrationPromptA.push({ role: 'system', content: __wrapInstructionTag('narration_instructions', narrationPrompt) });
 
         applyReplaceInPlace(narrationPromptA, /<_sexd>[\s\S]*?<\/_sexd>/gi, '');
-        const { text } = await callStageWithRetry('narration', narrationPromptA, 'narration');
-        narrationResp = text;
+        // NARRATION stage: sanitize returned content before summary stage
+        const { text: narrationText } = await callStageWithRetry('narration', narrationPromptA, 'narration');
+        narrationResp = __stripTagBlocksFromText(narrationText || '', __STAGE_INSTRUCTION_TAGS).trim();
         appendBlockToAssistant(assistantIndex, 'narration', narrationResp || '(no narration)', { triggerTableEdit: false });
     }
     
