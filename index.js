@@ -721,13 +721,6 @@ function __toGlobalRegex(regexOrText) {
     return new RegExp(__escapeRegex(String(regexOrText)), 'g');
 }
 
-function __wrapInstructionTag(tagName, content) {
-    const tag = String(tagName || '').trim();
-    const bodyRaw = String(content ?? '');
-    const body = __stripTagBlocksFromText(bodyRaw, tag).trim(); // avoid nested duplicate tags
-    return `<${tag}>\n${body}\n</${tag}>`;
-}
-
 function __expandTemplateMacros(tpl, ctx = {}) {
     const map = {
         narration: ctx.narration ?? '',
