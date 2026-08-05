@@ -973,7 +973,7 @@ async function __runPostDefaultMultiStage(stmBase, thinking_raw, assistantIndex)
 
     // IMPORTANT: remove echoed instruction blocks from default output before reuse
     let thinking_content = __stripTagBlocksFromText(text || '', __STAGE_INSTRUCTION_TAGS).trim();
-
+    thinking_content = '';
     const previousSummary = getLongTermSummary();
     const expand = (tpl, ctx) => __expandTemplateMacros(tpl, ctx);
     const maxAttemptsSetting = 5;
