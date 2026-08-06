@@ -528,7 +528,10 @@ export async function handleCustomAPIRequest(systemPrompt, userPrompt, isStepByS
         }
 
         try { // Outer try for the whole attempt with the current key
-            const promptData = Array.isArray(systemPrompt) ? systemPrompt : userPrompt;
+           
+            const promptData = Array.isArray(systemPrompt)
+                ? systemPrompt
+                : (typeof systemPrompt === 'string' ? systemPrompt : (userPrompt ?? ''));
             let response; // Declare response variable
 
             // --- ALWAYS Use llmService ---

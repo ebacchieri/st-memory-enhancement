@@ -38,7 +38,9 @@ window.__stm_ms_state = {
     controller: null,
     // NEW: data prepared at prompt-ready, consumed after default LLM finishes
     pendingMultiStage: null,
-};
+    // NEW: prevent recursive prompt-ready injection for internal stage calls
+    internalCallDepth: 0,
+ };
 
 function __stm_markConsumed() {
     window.__stm_ms_state.inProgress = false;
@@ -65,6 +67,18 @@ window.stMemoryEnhancement.cancelMultiStage = function(reason = 'user_cancel') {
 // Hard suppression hook invoked from prompt ready
 function __stm_shouldSuppressDefaultLLM() {
     return window.__stm_ms_state && window.__stm_ms_state.consumed === true;
+}
+function __stm_isInternalStageCall() {
+        return Number(window.__stm_ms_state?.internalCallDepth || 0) > 0;
+}
+async function __stm_withInternalStageCall(run) {
+    const st = window.__stm_ms_state || (window.__stm_ms_state = {});
+    st.internalCallDepth = Number(st.internalCallDepth || 0) + 1;
+    try {
+        return await run();
+    } finally {
+        st.internalCallDepth = Math.max(0, Number(st.internalCallDepth || 1) - 1);
+    }
 }
 // Add near other small helpers (above onMessageReceived)
 function __normalizeMessageIndex(arg) {
@@ -1020,7 +1034,11 @@ async function __runPostDefaultMultiStage(stmBase, thinking_raw, assistantIndex)
                 return '';
             }
         };
-        return useMainAPI ? (await tryMain() || await tryCustom() || '') : (await tryCustom() || await tryMain() || '');
+        return await __stm_withInternalStageCall(async () =>
+            useMainAPI
+                ? (await tryMain() || await tryCustom() || '')
+                : (await tryCustom() || await tryMain() || '')
+        );
     }
 
     async function callStageWithRetry(stageName, payload, sanitizeStage) {
@@ -1877,6 +1895,9 @@ async function onMessageReceived(chat_id) {
 // REWRITE onChatCompletionPromptReady: inject thinking only, arm post-default multi-stage, do NOT cancel default LLM
 async function onChatCompletionPromptReady(eventData) {
     try {
+        // Ignore prompt-ready events produced by our own internal stage calls
+            if (__stm_isInternalStageCall()) return;
+        
         if (eventData.dryRun === true ||
             USER.tableBaseSetting.isExtensionAble === false ||
             USER.tableBaseSetting.isAiReadTable === false ||
