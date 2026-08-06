@@ -948,6 +948,26 @@ function __promptCopy(chat) {
         return { role, content: raw };
     });
 }
+
+function flattenChat(chat) {
+    if (!Array.isArray(chat)) return chat;
+    let buffChat = chat.map(m => {
+        const role = m?.role || (m?.is_user ? 'user' : (m?.is_system ? 'system' : 'assistant'));
+        let raw = '';
+        if (typeof m?.content === 'string') raw = m.content;
+        else if (typeof m?.mes === 'string') raw = m.mes;
+        // Force a new string instance
+        raw = (raw != null ? ('' + raw) : '');
+        return { role, content: raw };
+    });
+    let flattened = buffChat
+        .map(m => {
+            const content = typeof m?.content === 'string' ? m.content : '';
+            return `\n${content}`;
+        })
+        .join('\n\n');
+    return flattened;
+}
 function __toPromptChat(chat) {
     if (!Array.isArray(chat)) return [];
     return chat.map(m => {
@@ -1038,12 +1058,9 @@ async function __runPostDefaultMultiStage(stmBase, thinking_raw, assistantIndex)
             })
         ].filter(Boolean).join('\n\n');
         mainPrompt = __applyNameMacros(mainPrompt);
-        mainPrompt = __stripBlocksInPlace(mainPrompt, __STAGE_INSTRUCTION_TAGS);
-        let mainPromptA = __promptCopy(__promptBaseForStage(stmBase));
-        mainPromptA = __stripBlocksInPlace(mainPromptA, __STAGE_INSTRUCTION_TAGS);
-        mainPromptA.push({ role: 'system', content: __wrapInstructionTag('maininstructions', mainPrompt) });
+        let mainPromptA = `${stmBase}\n${__wrapInstructionTag('maininstructions', mainPrompt) }`;
 
-        //applyReplaceInPlace(mainPromptA, /<_beat>[\s\S]*?<\/_beat>/gi, '');
+        //mainPromptA=applyReplaceInPlace(mainPromptA, /<_beat>[\s\S]*?<\/_beat>/gi, '');
         // MAIN stage: sanitize returned content before reusing in later stages
         const { text: mainText } = await callStageWithRetry('main', mainPromptA, 'main');
         mainResp = __stripTagBlocksFromText(mainText || '', __STAGE_INSTRUCTION_TAGS).trim();
@@ -1062,13 +1079,9 @@ async function __runPostDefaultMultiStage(stmBase, thinking_raw, assistantIndex)
             })
         ].filter(Boolean).join('\n\n');
         narrationPrompt = __applyNameMacros(narrationPrompt);
-        narrationPrompt = __stripBlocksInPlace(narrationPrompt, __STAGE_INSTRUCTION_TAGS);
+        let narrationPromptA = `${stmBase}\n${__wrapInstructionTag('narrationinstructions', narrationPrompt)}`;
 
-        let narrationPromptA = __promptCopy(__promptBaseForStage(stmBase));
-        narrationPromptA = __stripBlocksInPlace(narrationPromptA, __STAGE_INSTRUCTION_TAGS);
-        narrationPromptA.push({ role: 'system', content: __wrapInstructionTag('narrationinstructions', narrationPrompt) });
-
-        applyReplaceInPlace(narrationPromptA, /<_sexd>[\s\S]*?<\/_sexd>/gi, '');
+        narrationPromptA=applyReplaceInPlace(narrationPromptA, /<_sexd>[\s\S]*?<\/_sexd>/gi, '');
         // NARRATION stage: sanitize returned content before summary stage
         const { text: narrationText } = await callStageWithRetry('narration', narrationPromptA, 'narration');
         narrationResp = __stripTagBlocksFromText(narrationText || '', __STAGE_INSTRUCTION_TAGS).trim();
@@ -1094,14 +1107,10 @@ async function __runPostDefaultMultiStage(stmBase, thinking_raw, assistantIndex)
             })
         ].filter(Boolean).join('\n\n');
         summaryPrompt = __applyNameMacros(summaryPrompt);
-        summaryPrompt = __stripBlocksInPlace(summaryPrompt, __STAGE_INSTRUCTION_TAGS);
+        let summaryPromptA = `${stmBase}\n${__wrapInstructionTag('summaryinstructions', summaryPrompt)}`;
 
-        let summaryPromptA = __promptCopy(__promptBaseForStage(stmBase));
-        summaryPromptA = __stripBlocksInPlace(summaryPromptA, __STAGE_INSTRUCTION_TAGS);
-
-        summaryPromptA.push({ role: 'system', content: __wrapInstructionTag('summaryinstructions', summaryPrompt) });
-        applyReplaceInPlace(summaryPromptA, /<_sexd>[\s\S]*?<\/_sexd>/gi, '');
-        applyReplaceInPlace(summaryPromptA, /<_sex>[\s\S]*?<\/_sex>/gi, '');
+        summaryPromptA=applyReplaceInPlace(summaryPromptA, /<_sexd>[\s\S]*?<\/_sexd>/gi, '');
+        summaryPromptA=applyReplaceInPlace(summaryPromptA, /<_sex>[\s\S]*?<\/_sex>/gi, '');
 
         const { text: summaryResp } = await callStageWithRetry('summary', summaryPromptA, 'main');
         updateLongTermSummary({
@@ -1905,7 +1914,8 @@ async function onChatCompletionPromptReady(eventData) {
             lastContent = `<lastusermessage>\n${lastContent}\n</lastusermessage>`;
             stmBase[lastUserIdx].content = lastContent;
         }
-        window.__stm_ms_state.pendingMultiStage = { stmBase, ts: Date.now() };
+        let stmBaseFinal = __stripTagBlocksFromText(flattenChat(stmBase), __STAGE_INSTRUCTION_TAGS).trim();
+        window.__stm_ms_state.pendingMultiStage = { stmBaseFinal, ts: Date.now() };
         // Sheets will be updated after post-default multi-stage completes
         updateSheetsView();
     } catch (error) {

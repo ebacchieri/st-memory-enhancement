@@ -232,13 +232,9 @@ export async function handleMainAPIRequest(systemPrompt, userPrompt, isSilent = 
         // Fallbacks (no TavernHelper):
         // 1) Single-message array (multistage uses this): call EDITOR.generateRaw directly
         if (messages.length === 1 && typeof messages[0]?.content === 'string') {
-            const response = await EDITOR.generateRaw(
-                messages[0].content,
-                '',
-                false,
-                false,
-                '' // no system prompt in this path
-            );
+            const params = { prompt: messages[0].content, systemPrompt: '' };
+
+            const response = await EDITOR.generateRaw(params);
             loadingToast?.close();
             return suspended ? 'suspended' : response;
         }
@@ -275,13 +271,9 @@ export async function handleMainAPIRequest(systemPrompt, userPrompt, isSilent = 
             });
         }
 
-        const response = await EDITOR.generateRaw(
-            finalUserPrompt,
-            '',
-            false,
-            false,
-            finalSystemPrompt,
-        );
+        const params = { prompt: finalSystemPrompt+finalUserPrompt, systemPrompt: '' };
+
+        const response = await EDITOR.generateRaw(params);
         loadingToast?.close();
         return suspended ? 'suspended' : response;
     }
