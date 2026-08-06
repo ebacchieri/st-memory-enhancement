@@ -140,6 +140,24 @@ function __stripTableEditBlocks(text) {
     if (typeof text !== 'string') return text;
     return text.replace(/<tableedit>[\s\S]*?<\/tableedit>/gi, '');
 }
+function __splitMessageTemplateForStages(template) {
+    const raw = String(template ?? '');
+    if (!raw.trim()) {
+        return { memoryTemplate: '', mainTableEditTemplate: '' };
+    }
+    // Backward-compatible splitter:
+    // everything from "# Memory Table Operations" to the end is treated as main-only instructions.
+    const marker = /(?:^|\n)\s*#\s*Memory\s*Table\s*Operations\s*:?\s*/i;
+    const match = marker.exec(raw);
+    if (!match || !Number.isFinite(match.index)) {
+        return { memoryTemplate: raw, mainTableEditTemplate: '' };
+    }
+
+    const idx = match.index;
+    const memoryTemplate = raw.slice(0, idx).trim();
+    const mainTableEditTemplate = raw.slice(idx).trim();
+    return { memoryTemplate, mainTableEditTemplate };
+}
 function __getSummaryStore() {
     const ctx = USER.getContext();
     ctx.chatMetadata = ctx.chatMetadata || {};
@@ -546,9 +564,9 @@ function appendBlockToAssistant(msgIndex, blockLabel, content, opts = {}) {
     const S = USER.tableBaseSetting || {};
     let cleanedContent = (typeof content === 'string') ? content : String(content ?? '');
     if (blockLabel !== 'main') {
-        cleanedContent = cleanedContent.replace(/```/gi, '');
-        cleanedContent = __stripTableEditBlocks(cleanedContent);
-    }    const msg = ctx.chat[msgIndex];
+       cleanedContent = cleanedContent.replace(/```/gi, '');
+    }
+    const msg = ctx.chat[msgIndex];
     if (!msg) return;
 
     // Build block
@@ -1007,10 +1025,8 @@ async function __runPostDefaultMultiStage(stmBase, thinking_raw, assistantIndex)
 
     const { text } = __sanitizeDeepSeekOutput(thinking_raw, 'thinking');
 
-    // IMPORTANT: remove echoed instruction blocks from default output before reuse
     let thinking_content = __stripTagBlocksFromText(text || '', __STAGE_INSTRUCTION_TAGS).trim();
-    thinking_content = __stripTableEditBlocks(thinking_content).trim();
-    const stmBaseNoTableEdit = __stripTableEditBlocks(stmBase || '');
+
 
     const previousSummary = getLongTermSummary();
     const expand = (tpl, ctx) => __expandTemplateMacros(tpl, ctx);
@@ -1071,32 +1087,17 @@ async function __runPostDefaultMultiStage(stmBase, thinking_raw, assistantIndex)
     }
 
     // We already have a default LLM response at assistantIndex; append our stages onto that message
-        const ctx = USER.getContext();
-        // Keep <tableedit> only inside <main> block in the final assistant message
-        try {
-            const msg = ctx?.chat?.[assistantIndex];
-            if (msg && typeof msg.mes === 'string') {
-                const cleaned = __stripTableEditBlocks(msg.mes);
-                if (cleaned !== msg.mes) {
-                    msg.mes = cleaned;
-                    msg.swipes = Array.isArray(msg.swipes) ? msg.swipes : [''];
-                    msg.swipe_id = typeof msg.swipe_id === 'number' ? msg.swipe_id : 0;
-                    msg.swipes[msg.swipe_id] = cleaned;
-                    msg.extra = msg.extra || {};
-                    msg.extra.display_text = cleaned;
-                }
-            }
-        } catch (e) {
-            console.warn('[PostMultiStage] Failed to pre-clean tableedit from assistant shell:', e);
-        }
+    const ctx = USER.getContext();
 
     // MAIN
     let mainResp = '';
-    if (mainTpl) {
-        let mainPrompt = [            
-            expand(mainTpl, {                
-                thinking: thinking_content               
-            })
+    const mainOnlyTableEditPrompt = String(window.__stm_ms_state?.pendingMultiStage?.mainTableEditPrompt || '').trim();
+    if (enableMain && (mainTpl || mainOnlyTableEditPrompt)) {
+        let mainPrompt = [
+            expand(mainTpl, {
+                thinking: thinking_content
+            }),
+            mainOnlyTableEditPrompt,
         ].filter(Boolean).join('\n\n');
         mainPrompt = __applyNameMacros(mainPrompt);
         let mainPromptA = stmBase + '\n' + __wrapInstructionTag('maininstructions', mainPrompt);
@@ -1120,13 +1121,12 @@ async function __runPostDefaultMultiStage(stmBase, thinking_raw, assistantIndex)
             })
         ].filter(Boolean).join('\n\n');
         narrationPrompt = __applyNameMacros(narrationPrompt);
-        let narrationPromptA = stmBaseNoTableEdit + '\n' + __wrapInstructionTag('narrationinstructions', narrationPrompt);
+        let narrationPromptA = stmBase + '\n' + __wrapInstructionTag('narrationinstructions', narrationPrompt);
 
         narrationPromptA=applyReplaceInPlace(narrationPromptA, /<_sexd>[\s\S]*?<\/_sexd>/gi, '');
         // NARRATION stage: sanitize returned content before summary stage
         const { text: narrationText } = await callStageWithRetry('narration', narrationPromptA, 'narration');
         narrationResp = __stripTagBlocksFromText(narrationText || '', __STAGE_INSTRUCTION_TAGS).trim();
-        narrationResp = __stripTableEditBlocks(narrationResp).trim();
         appendBlockToAssistant(assistantIndex, 'narration', narrationResp || '(no narration)', { triggerTableEdit: false });
     }
     
@@ -1149,15 +1149,13 @@ async function __runPostDefaultMultiStage(stmBase, thinking_raw, assistantIndex)
             })
         ].filter(Boolean).join('\n\n');
         summaryPrompt = __applyNameMacros(summaryPrompt);
-        let summaryPromptA = stmBaseNoTableEdit + '\n' + __wrapInstructionTag('summaryinstructions', summaryPrompt);
+        let summaryPromptA = stmBase + '\n' + __wrapInstructionTag('summaryinstructions', summaryPrompt);
 
         summaryPromptA=applyReplaceInPlace(summaryPromptA, /<_sexd>[\s\S]*?<\/_sexd>/gi, '');
         summaryPromptA=applyReplaceInPlace(summaryPromptA, /<_sex>[\s\S]*?<\/_sex>/gi, '');
 
         const { text: summaryRaw } = await callStageWithRetry('summary', summaryPromptA, 'main');
-        const summaryResp = __stripTableEditBlocks(
-            __stripTagBlocksFromText(summaryRaw || '', __STAGE_INSTRUCTION_TAGS)
-        ).trim();
+        const summaryResp = __stripTagBlocksFromText(summaryRaw || '', __STAGE_INSTRUCTION_TAGS).trim();
         updateLongTermSummary({
             narration: narrationResp,
             thinking: '',
@@ -1210,6 +1208,7 @@ async function __buildPastEventsFromRag(eventData) {
 // === MODIFY: initTableDataWithRag -> use stored long-term summary instead of RAG for {{long_term_memory}} ===
 async function initTableDataWithRag(eventData) {
     const template = USER.tableBaseSetting.message_template || '';
+    const { memoryTemplate, mainTableEditTemplate } = __splitMessageTemplateForStages(template);
 
     const piece =
         (BASE.getReferencePiece && BASE.getReferencePiece()) ||
@@ -1233,8 +1232,12 @@ async function initTableDataWithRag(eventData) {
     // Now: use persistent long-term summary (branch-based).
     const longTermSummary = getLongTermSummary();
 
-    let replaced = template.replace(/{{tableData}}/g, tableData);
-    replaced = replaced.replace(/{{long_term_memory}}/g, longTermSummary);
+    let replacedMemory = memoryTemplate.replace(/{{tableData}}/g, tableData);
+    replacedMemory = replacedMemory.replace(/{{long_term_memory}}/g, longTermSummary);
+    
+    let replacedMainOnly = mainTableEditTemplate.replace(/{{tableData}}/g, tableData);
+    replacedMainOnly = replacedMainOnly.replace(/{{long_term_memory}}/g, longTermSummary);
+
 
     if (!template.includes('{{tableData}}')) {
         console.warn('[Memory Enhancement] message_template missing {{tableData}}.');
@@ -1245,7 +1248,10 @@ async function initTableDataWithRag(eventData) {
         console.warn('[LongTermSummary] No stored long-term summary yet for this branch.');
     }
 
-    return replaceUserTag(replaced);
+    return {
+        memoryPrompt: replaceUserTag(replacedMemory),
+        mainTableEditPrompt: replaceUserTag(replacedMainOnly),
+    };
 }
 /**
  * 修复值中不正确的转义单引号
@@ -1941,8 +1947,12 @@ async function onChatCompletionPromptReady(eventData) {
             }
         } catch (e) { console.warn('[RAG] vectorize on prompt-ready failed:', e); }
 
-        // Build memory for our later multi-stage only (not injected into the default call)
-        const promptContent = await initTableDataWithRag(eventData); // table + long term summary
+        // Build decoupled stage payloads:
+        // - memoryPrompt => injected into default prompt path (thus present in stmBase for every stage)
+        // - mainTableEditPrompt => appended only in MAIN stage prompt
+        const stagePayload = await initTableDataWithRag(eventData);
+        const promptContent = stagePayload?.memoryPrompt || '';
+        const mainTableEditPrompt = stagePayload?.mainTableEditPrompt || '';
         eventData.chat.push({ role: 'system', content: `<memory>\n${promptContent}\n</memory>` });
 
         // NEW: prepare stmBase (before thinking sanitizes chat) and arm pendingMultiStage here (once)
@@ -1963,7 +1973,9 @@ async function onChatCompletionPromptReady(eventData) {
             stmBaseA[lastUserIdx].content = lastContent;
         }
         let stmBase = __stripTagBlocksFromText(flattenChat(stmBaseA), __STAGE_INSTRUCTION_TAGS).trim();
-        window.__stm_ms_state.pendingMultiStage = { stmBase, ts: Date.now() };
+        window.__stm_ms_state.pendingMultiStage = { stmBase, mainTableEditPrompt, ts: Date.now() };
+        // Sheets will be updated after post-default multi-stage completes
+        updateSheetsView();
         // Sheets will be updated after post-default multi-stage completes
         updateSheetsView();
     } catch (error) {
