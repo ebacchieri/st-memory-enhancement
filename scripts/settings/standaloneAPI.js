@@ -254,8 +254,7 @@ export async function handleMainAPIRequest(systemPrompt, userPrompt, isSilent = 
 
     } else {
         // Original string-based path
-        finalSystemPrompt = systemPrompt;
-        finalUserPrompt = userPrompt;
+        let strBuff = (systemPrompt || '') + '\n' + (userPrompt || '');
 
         createLoadingToast(true, isSilent).then((r) => {
             if (loadingToast) loadingToast.close();
@@ -270,8 +269,8 @@ export async function handleMainAPIRequest(systemPrompt, userPrompt, isSilent = 
                 }
             });
         }
-
-        const params = { prompt: finalSystemPrompt+finalUserPrompt, systemPrompt: '' };
+        
+        const params = { prompt: strBuff, systemPrompt: '' };
 
         const response = await EDITOR.generateRaw(params);
         loadingToast?.close();
