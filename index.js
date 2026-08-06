@@ -544,8 +544,11 @@ function appendBlockToAssistant(msgIndex, blockLabel, content, opts = {}) {
     const ctx = USER.getContext();
     const { eventSource, event_types, messageFormatting } = ctx;
     const S = USER.tableBaseSetting || {};
-    let cleanedContent = (blockLabel !== 'main') ? content.replace(/```/gi, '') : content;
-    const msg = ctx.chat[msgIndex];
+    let cleanedContent = (typeof content === 'string') ? content : String(content ?? '');
+    if (blockLabel !== 'main') {
+        cleanedContent = cleanedContent.replace(/```/gi, '');
+        cleanedContent = __stripTableEditBlocks(cleanedContent);
+    }    const msg = ctx.chat[msgIndex];
     if (!msg) return;
 
     // Build block
@@ -1006,6 +1009,9 @@ async function __runPostDefaultMultiStage(stmBase, thinking_raw, assistantIndex)
 
     // IMPORTANT: remove echoed instruction blocks from default output before reuse
     let thinking_content = __stripTagBlocksFromText(text || '', __STAGE_INSTRUCTION_TAGS).trim();
+    thinking_content = __stripTableEditBlocks(thinking_content).trim();
+    const stmBaseNoTableEdit = __stripTableEditBlocks(stmBase || '');
+
     const previousSummary = getLongTermSummary();
     const expand = (tpl, ctx) => __expandTemplateMacros(tpl, ctx);
     const maxAttemptsSetting = 5;
@@ -1065,7 +1071,24 @@ async function __runPostDefaultMultiStage(stmBase, thinking_raw, assistantIndex)
     }
 
     // We already have a default LLM response at assistantIndex; append our stages onto that message
-    const ctx = USER.getContext();
+        const ctx = USER.getContext();
+        // Keep <tableedit> only inside <main> block in the final assistant message
+        try {
+            const msg = ctx?.chat?.[assistantIndex];
+            if (msg && typeof msg.mes === 'string') {
+                const cleaned = __stripTableEditBlocks(msg.mes);
+                if (cleaned !== msg.mes) {
+                    msg.mes = cleaned;
+                    msg.swipes = Array.isArray(msg.swipes) ? msg.swipes : [''];
+                    msg.swipe_id = typeof msg.swipe_id === 'number' ? msg.swipe_id : 0;
+                    msg.swipes[msg.swipe_id] = cleaned;
+                    msg.extra = msg.extra || {};
+                    msg.extra.display_text = cleaned;
+                }
+            }
+        } catch (e) {
+            console.warn('[PostMultiStage] Failed to pre-clean tableedit from assistant shell:', e);
+        }
 
     // MAIN
     let mainResp = '';
@@ -1097,12 +1120,13 @@ async function __runPostDefaultMultiStage(stmBase, thinking_raw, assistantIndex)
             })
         ].filter(Boolean).join('\n\n');
         narrationPrompt = __applyNameMacros(narrationPrompt);
-        let narrationPromptA = stmBase + '\n' + __wrapInstructionTag('narrationinstructions', narrationPrompt);
+        let narrationPromptA = stmBaseNoTableEdit + '\n' + __wrapInstructionTag('narrationinstructions', narrationPrompt);
 
         narrationPromptA=applyReplaceInPlace(narrationPromptA, /<_sexd>[\s\S]*?<\/_sexd>/gi, '');
         // NARRATION stage: sanitize returned content before summary stage
         const { text: narrationText } = await callStageWithRetry('narration', narrationPromptA, 'narration');
         narrationResp = __stripTagBlocksFromText(narrationText || '', __STAGE_INSTRUCTION_TAGS).trim();
+        narrationResp = __stripTableEditBlocks(narrationResp).trim();
         appendBlockToAssistant(assistantIndex, 'narration', narrationResp || '(no narration)', { triggerTableEdit: false });
     }
     
@@ -1125,12 +1149,15 @@ async function __runPostDefaultMultiStage(stmBase, thinking_raw, assistantIndex)
             })
         ].filter(Boolean).join('\n\n');
         summaryPrompt = __applyNameMacros(summaryPrompt);
-        let summaryPromptA = stmBase + '\n' + __wrapInstructionTag('summaryinstructions', summaryPrompt);
+        let summaryPromptA = stmBaseNoTableEdit + '\n' + __wrapInstructionTag('summaryinstructions', summaryPrompt);
 
         summaryPromptA=applyReplaceInPlace(summaryPromptA, /<_sexd>[\s\S]*?<\/_sexd>/gi, '');
         summaryPromptA=applyReplaceInPlace(summaryPromptA, /<_sex>[\s\S]*?<\/_sex>/gi, '');
 
-        const { text: summaryResp } = await callStageWithRetry('summary', summaryPromptA, 'main');
+        const { text: summaryRaw } = await callStageWithRetry('summary', summaryPromptA, 'main');
+        const summaryResp = __stripTableEditBlocks(
+            __stripTagBlocksFromText(summaryRaw || '', __STAGE_INSTRUCTION_TAGS)
+        ).trim();
         updateLongTermSummary({
             narration: narrationResp,
             thinking: '',
