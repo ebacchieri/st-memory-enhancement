@@ -922,8 +922,8 @@ function __stripBlocksInPlace(messages, tags) {
 function __wrapInstructionTag(tagName, content) {
     const tag = String(tagName || '').trim();
     const bodyRaw = String(content ?? '');
-    //const body = __stripTagBlocksFromText(bodyRaw, __STAGE_INSTRUCTION_TAGS).trim();
-    return `<${tag}>\n${bodyRaw}\n</${tag}>`;
+    const body = __stripTagBlocksFromText(bodyRaw, tagName).trim();
+    return `<${tag}>\n${body}\n</${tag}>`;
 }
 
 function __promptBaseForStage(stmBase2) {
@@ -1058,7 +1058,7 @@ async function __runPostDefaultMultiStage(stmBase, thinking_raw, assistantIndex)
             })
         ].filter(Boolean).join('\n\n');
         mainPrompt = __applyNameMacros(mainPrompt);
-        let mainPromptA = `${stmBase}\n${__wrapInstructionTag('maininstructions', mainPrompt) }`;
+        let mainPromptA = stmBase + '\n' + __wrapInstructionTag('maininstructions', mainPrompt);
 
         //mainPromptA=applyReplaceInPlace(mainPromptA, /<_beat>[\s\S]*?<\/_beat>/gi, '');
         // MAIN stage: sanitize returned content before reusing in later stages
@@ -1079,7 +1079,7 @@ async function __runPostDefaultMultiStage(stmBase, thinking_raw, assistantIndex)
             })
         ].filter(Boolean).join('\n\n');
         narrationPrompt = __applyNameMacros(narrationPrompt);
-        let narrationPromptA = `${stmBase}\n${__wrapInstructionTag('narrationinstructions', narrationPrompt)}`;
+        let narrationPromptA = stmBase + '\n' + __wrapInstructionTag('narrationinstructions', narrationPrompt);
 
         narrationPromptA=applyReplaceInPlace(narrationPromptA, /<_sexd>[\s\S]*?<\/_sexd>/gi, '');
         // NARRATION stage: sanitize returned content before summary stage
@@ -1107,7 +1107,7 @@ async function __runPostDefaultMultiStage(stmBase, thinking_raw, assistantIndex)
             })
         ].filter(Boolean).join('\n\n');
         summaryPrompt = __applyNameMacros(summaryPrompt);
-        let summaryPromptA = `${stmBase}\n${__wrapInstructionTag('summaryinstructions', summaryPrompt)}`;
+        let summaryPromptA = stmBase + '\n' + __wrapInstructionTag('summaryinstructions', summaryPrompt);
 
         summaryPromptA=applyReplaceInPlace(summaryPromptA, /<_sexd>[\s\S]*?<\/_sexd>/gi, '');
         summaryPromptA=applyReplaceInPlace(summaryPromptA, /<_sex>[\s\S]*?<\/_sex>/gi, '');
@@ -1898,11 +1898,11 @@ async function onChatCompletionPromptReady(eventData) {
         eventData.chat.push({ role: 'system', content: `<memory>\n${promptContent}\n</memory>` });
 
         // NEW: prepare stmBase (before thinking sanitizes chat) and arm pendingMultiStage here (once)
-        let stmBase = __promptCopy(eventData.chat);
+        let stmBaseA = __promptCopy(eventData.chat);
         // Inject THINKING into outgoing chat for default LLM
         __applyThinkingInjection(eventData);     
         
-        stmBase.forEach(m => {
+        stmBaseA.forEach(m => {
             if (typeof m.content === 'string') m.content = `<previousmessage>\n${m.content}\n</previousmessage>`;
         });
         let lastUserIdx = -1;
@@ -1912,10 +1912,10 @@ async function onChatCompletionPromptReady(eventData) {
         if (lastUserIdx !== -1) {
             let lastContent = eventData.chat[lastUserIdx].content.replace(/<previousmessage>/gi, '').replace(/<\/previousmessage>/gi, '');
             lastContent = `<lastusermessage>\n${lastContent}\n</lastusermessage>`;
-            stmBase[lastUserIdx].content = lastContent;
+            stmBaseA[lastUserIdx].content = lastContent;
         }
-        let stmBaseFinal = __stripTagBlocksFromText(flattenChat(stmBase), __STAGE_INSTRUCTION_TAGS).trim();
-        window.__stm_ms_state.pendingMultiStage = { stmBaseFinal, ts: Date.now() };
+        let stmBase = __stripTagBlocksFromText(flattenChat(stmBaseA), __STAGE_INSTRUCTION_TAGS).trim();
+        window.__stm_ms_state.pendingMultiStage = { stmBase, ts: Date.now() };
         // Sheets will be updated after post-default multi-stage completes
         updateSheetsView();
     } catch (error) {
