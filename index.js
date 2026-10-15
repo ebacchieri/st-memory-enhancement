@@ -844,8 +844,8 @@ function __applyThinkingInjection(eventData) {
 
         if (lastUserIdx !== -1) {
             const prev = eventData.chat[lastUserIdx].content || '';
-            const prevClean = __stripTagBlocksFromText(prev, __STAGE_INSTRUCTION_TAGS);
-            eventData.chat[lastUserIdx].content = `${wrapped}\n\n${prevClean}`;
+            //const prevClean = __stripTagBlocksFromText(prev, __STAGE_INSTRUCTION_TAGS);
+            eventData.chat[lastUserIdx].content = `${wrapped}\n\n${prev}`;
         } else {
             const role = getMesRole() || 'system';
             eventData.chat.push({ role, content: wrapped });
@@ -885,21 +885,21 @@ function __stripTagBlocksFromText(text, tags) {
 
     let out = text;
 
-    // 1) DOM pass (no early return)
-    try {
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(`<div id="__root__">${out}</div>`, 'text/html');
-        const root = doc.getElementById('__root__');
+    // // 1) DOM pass (no early return)
+    // try {
+    //     const parser = new DOMParser();
+    //     const doc = parser.parseFromString(`<div id="__root__">${out}</div>`, 'text/html');
+    //     const root = doc.getElementById('__root__');
 
-        if (root) {
-            list.forEach(tag => {
-                root.querySelectorAll(tag).forEach(node => node.remove());
-            });
-            out = root.innerHTML;
-        }
-    } catch {
-        // keep original `out`
-    }
+    //     if (root) {
+    //         list.forEach(tag => {
+    //             root.querySelectorAll(tag).forEach(node => node.remove());
+    //         });
+    //         out = root.innerHTML;
+    //     }
+    // } catch {
+    //     // keep original `out`
+    // }
 
     // 2) Regex pass (always run)
     const escapeRegex = s => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
