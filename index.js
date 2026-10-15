@@ -864,7 +864,7 @@ function __applyMemoryInjection(eventData, promptContent) {
             if (eventData.chat[i]?.role === 'user') { lastUserIdx = i; break; }
         }
 
-        const wrapped = { role: 'system', content: `<memory>\n${promptContent}\n</memory>` };
+        const wrapped = `<memory>\n${promptContent}\n</memory>`;
 
 
         if (lastUserIdx !== -1) {
