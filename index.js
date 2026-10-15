@@ -854,6 +854,31 @@ function __applyThinkingInjection(eventData) {
         console.warn('[ThinkingInjection] Failed to inject thinking content:', e);
     }
 }
+
+function __applyMemoryInjection(eventData, promptContent) {
+    try {
+        const S = USER.tableBaseSetting || {};
+        
+        let lastUserIdx = -1;
+        for (let i = eventData.chat.length - 1; i >= 0; i--) {
+            if (eventData.chat[i]?.role === 'user') { lastUserIdx = i; break; }
+        }
+
+        const wrapped = { role: 'system', content: `<memory>\n${promptContent}\n</memory>` };
+
+
+        if (lastUserIdx !== -1) {
+            const prev = eventData.chat[lastUserIdx].content || '';
+            //const prevClean = __stripTagBlocksFromText(prev, __STAGE_INSTRUCTION_TAGS);
+            eventData.chat[lastUserIdx].content = `${wrapped}\n\n${prev}`;
+        } else {
+            const role = getMesRole() || 'system';
+            eventData.chat.push({ role, content: wrapped });
+        }
+    } catch (e) {
+        console.warn('[ThinkingInjection] Failed to inject thinking content:', e);
+    }
+}
 const __STAGE_INSTRUCTION_TAGS = Object.freeze([
     'thinkinginstructions',
     'maininstructions',
@@ -1237,7 +1262,6 @@ async function initTableDataWithRag(eventData) {
     
     let replacedMainOnly = mainTableEditTemplate.replace(/{{tableData}}/g, tableData);
     replacedMainOnly = replacedMainOnly.replace(/{{long_term_memory}}/g, longTermSummary);
-
 
     if (!template.includes('{{tableData}}')) {
         console.warn('[Memory Enhancement] message_template missing {{tableData}}.');
@@ -1953,8 +1977,7 @@ async function onChatCompletionPromptReady(eventData) {
         const stagePayload = await initTableDataWithRag(eventData);
         const promptContent = stagePayload?.memoryPrompt || '';
         const mainTableEditPrompt = stagePayload?.mainTableEditPrompt || '';
-        eventData.chat.push({ role: 'system', content: `<memory>\n${promptContent}\n</memory>` });
-
+        __applyMemoryInjection(eventData, promptContent);
         // NEW: prepare stmBase (before thinking sanitizes chat) and arm pendingMultiStage here (once)
         let stmBaseA = __promptCopy(eventData.chat);
         // Inject THINKING into outgoing chat for default LLM
