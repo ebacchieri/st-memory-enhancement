@@ -1916,6 +1916,7 @@ async function onMessageReceived(chat_id) {
         return;
     }
     const S = USER.tableBaseSetting || {};
+    const ctx = USER.getContext();
     const enableMain = S.enable_main_stage !== false;
     if (!enableMain) {
         st.inProgress = false;
