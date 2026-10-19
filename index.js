@@ -1927,7 +1927,8 @@ async function onMessageReceived(chat_id) {
             console.warn('table edit parse failed:', e);
         }
 
-        updateSheetsView();
+        try { await ctx.saveChat?.(); } catch { }
+        try { await updateSheetsView(idx); } catch { }
         return;
     }
     else {
