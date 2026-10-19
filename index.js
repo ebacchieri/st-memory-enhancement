@@ -1911,28 +1911,26 @@ async function onMessageReceived(chat_id) {
     const st = window.__stm_ms_state;
     const assistantContent = msg.mes;
     //st.pendingMultiStage.stmBase.push({ role: 'assistant', content: assistantContent });
-    if (!st.pendingMultiStage || !__hasAnyPriorUserMessage(idx)) {
-        updateSheetsView();
-        return;
-    }
+    
     const S = USER.tableBaseSetting || {};
     const ctx = USER.getContext();
     const enableMain = S.enable_main_stage !== false;
     if (!enableMain) {
         st.inProgress = false;
-        applyShortTermMemoryWindow();
         try {
             handleEditStrInMessage(msg, idx, true);
         }
         catch (e) {
             console.warn('table edit parse failed:', e);
         }
-
-        try { await ctx.saveChat?.(); } catch { }
-        try { await updateSheetsView(idx); } catch { }
+        updateSheetsView();
         return;
     }
     else {
+        if (!st.pendingMultiStage || !__hasAnyPriorUserMessage(idx)) {
+            updateSheetsView();
+            return;
+        }
         // Ensure mainTableEditPrompt is appended to the last assistant message in stmBase
         if (st.inProgress) return;
 
