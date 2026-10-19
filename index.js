@@ -1920,6 +1920,13 @@ async function onMessageReceived(chat_id) {
     if (!enableMain) {
         st.inProgress = false;
         applyShortTermMemoryWindow();
+        try {
+            handleEditStrInMessage(msg, idx, true);
+        }
+        catch (e) {
+            console.warn('table edit parse failed:', e);
+        }
+
         updateSheetsView();
         return;
     }
