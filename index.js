@@ -1047,7 +1047,12 @@ async function __runPostDefaultMultiStage(stmBase, thinking_raw, assistantIndex)
     let narrationTpl = enableNarration ? (S.narration_template || '').trim() : '';
     let mainTpl = enableMain ? (S.main_response_template || '').trim() : '';
     let longTermSummaryTpl = enableSummary ? (S.long_term_summary_template || '').trim() : '';
-
+    if (!enableMain) {
+        try { await updateSheetsView(assistantIndex); } catch { }
+        // Reset state to avoid accumulation on next assistant message
+        window.__stm_ms_state.pendingMultiStage = null;
+        return;
+    };
     const { text } = __sanitizeDeepSeekOutput(thinking_raw, 'thinking');
 
     let thinking_content = __stripTagBlocksFromText(text || '', __STAGE_INSTRUCTION_TAGS).trim();
@@ -1910,18 +1915,30 @@ async function onMessageReceived(chat_id) {
         updateSheetsView();
         return;
     }
-    // NEW: guard against re-entrancy caused by our own CHARACTER_MESSAGE_RENDERED emissions
-    if (st.inProgress) return;
-    
-    try {
-        st.inProgress = true;
-        await __runPostDefaultMultiStage(st.pendingMultiStage.stmBase, assistantContent, idx);
-    } catch (e) {
-        console.warn('[PostMultiStage] failed:', e);
-    } finally {        
+    const S = USER.tableBaseSetting || {};
+    const enableMain = S.enable_main_stage !== false;
+    if (!enableMain) {
         st.inProgress = false;
-        applyShortTermMemoryWindow(); // ensure STM window applied after multi-stage
+        applyShortTermMemoryWindow();
+        updateSheetsView();
+        return;
     }
+    else {
+        // Ensure mainTableEditPrompt is appended to the last assistant message in stmBase
+        if (st.inProgress) return;
+
+        try {
+            st.inProgress = true;
+            await __runPostDefaultMultiStage(st.pendingMultiStage.stmBase, assistantContent, idx);
+        } catch (e) {
+            console.warn('[PostMultiStage] failed:', e);
+        } finally {
+            st.inProgress = false;
+            applyShortTermMemoryWindow(); // ensure STM window applied after multi-stage
+        }
+    }
+    // NEW: guard against re-entrancy caused by our own CHARACTER_MESSAGE_RENDERED emissions
+    
     return;
 
     // Legacy path
@@ -1982,21 +1999,25 @@ async function onChatCompletionPromptReady(eventData) {
         let stmBaseA = __promptCopy(eventData.chat);
         // Inject THINKING into outgoing chat for default LLM
         __applyThinkingInjection(eventData);     
+        const S = USER.tableBaseSetting || {};
+        const enableMain = S.enable_main_stage !== false;
+        if (enableMain) {
+            stmBaseA.forEach(m => {
+                if (typeof m.content === 'string') m.content = `<previousmessage>\n${m.content}\n</previousmessage>`;
+            });
+            let lastUserIdx = -1;
+            for (let i = eventData.chat.length - 1; i >= 0; i--) {
+                if (eventData.chat[i]?.role === 'user') { lastUserIdx = i; break; }
+            }
+            if (lastUserIdx !== -1) {
+                let lastContent = eventData.chat[lastUserIdx].content.replace(/<previousmessage>/gi, '').replace(/<\/previousmessage>/gi, '');
+                lastContent = `<lastusermessage>\n${lastContent}\n</lastusermessage>`;
+                stmBaseA[lastUserIdx].content = lastContent;
+            }
+            let stmBase = __stripTagBlocksFromText(flattenChat(stmBaseA), __STAGE_INSTRUCTION_TAGS).trim();
+            window.__stm_ms_state.pendingMultiStage = { stmBase, mainTableEditPrompt, ts: Date.now() };
+        }
         
-        stmBaseA.forEach(m => {
-            if (typeof m.content === 'string') m.content = `<previousmessage>\n${m.content}\n</previousmessage>`;
-        });
-        let lastUserIdx = -1;
-        for (let i = eventData.chat.length - 1; i >= 0; i--) {
-            if (eventData.chat[i]?.role === 'user') { lastUserIdx = i; break; }
-        }
-        if (lastUserIdx !== -1) {
-            let lastContent = eventData.chat[lastUserIdx].content.replace(/<previousmessage>/gi, '').replace(/<\/previousmessage>/gi, '');
-            lastContent = `<lastusermessage>\n${lastContent}\n</lastusermessage>`;
-            stmBaseA[lastUserIdx].content = lastContent;
-        }
-        let stmBase = __stripTagBlocksFromText(flattenChat(stmBaseA), __STAGE_INSTRUCTION_TAGS).trim();
-        window.__stm_ms_state.pendingMultiStage = { stmBase, mainTableEditPrompt, ts: Date.now() };
         // Sheets will be updated after post-default multi-stage completes
         updateSheetsView();
         // Sheets will be updated after post-default multi-stage completes
