@@ -1694,6 +1694,7 @@ export function parseTableEditTag(piece, mesIndex = -1, ignoreCheck = false) {
         executeAction(EditAction, sheets);
     }
     sheets.forEach(sheet => sheet.save(piece, true));
+    replaceTableEditTag(piece, '');
     return true;
 }
 
