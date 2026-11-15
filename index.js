@@ -841,10 +841,12 @@ function __applyThinkingInjection(eventData) {
         }
 
         const wrapped = __wrapInstructionTag('thinkinginstructions', thinkingContent.trim());
-
+        eventData.chat.forEach(m => {
+            if (typeof m.content === 'string') m.content = __stripTagBlocksFromText(m.content, __MP_INSTRUCTION_TAGS);
+        });
         if (lastUserIdx !== -1) {
             const prev = eventData.chat[lastUserIdx].content || '';
-            //const prevClean = __stripTagBlocksFromText(prev, __STAGE_INSTRUCTION_TAGS);
+            //const prevClean = __stripTagBlocksFromText(prev, __MP_INSTRUCTION_TAGS);
             eventData.chat[lastUserIdx].content = `${wrapped}\n\n${prev}`;
         } else {
             const role = getMesRole() || 'system';
@@ -884,6 +886,14 @@ const __STAGE_INSTRUCTION_TAGS = Object.freeze([
     'maininstructions',
     'narrationinstructions',
     'summaryinstructions',
+]);
+
+const __MP_INSTRUCTION_TAGS = Object.freeze([
+    'mpinstructions'
+]);
+
+const __TP_INSTRUCTION_TAGS = Object.freeze([
+    'tpinstructions'
 ]);
 
 function __escapeRegex(text) {
@@ -2004,8 +2014,6 @@ async function onChatCompletionPromptReady(eventData) {
         __applyMemoryInjection(eventData, promptContent);
         // NEW: prepare stmBase (before thinking sanitizes chat) and arm pendingMultiStage here (once)
         let stmBaseA = __promptCopy(eventData.chat);
-        // Inject THINKING into outgoing chat for default LLM
-        __applyThinkingInjection(eventData);     
         const S = USER.tableBaseSetting || {};
         const enableMain = S.enable_main_stage !== false;
         if (enableMain) {
@@ -2022,8 +2030,13 @@ async function onChatCompletionPromptReady(eventData) {
                 stmBaseA[lastUserIdx].content = lastContent;
             }
             let stmBase = __stripTagBlocksFromText(flattenChat(stmBaseA), __STAGE_INSTRUCTION_TAGS).trim();
-            window.__stm_ms_state.pendingMultiStage = { stmBase, mainTableEditPrompt, ts: Date.now() };
+            let stmBase2 = __stripTagBlocksFromText(stmBase, __TP_INSTRUCTION_TAGS).trim();
+            window.__stm_ms_state.pendingMultiStage = { stmBase2, mainTableEditPrompt, ts: Date.now() };
         }
+        // Inject THINKING into outgoing chat for default LLM
+        __applyThinkingInjection(eventData);     
+        
+       
         
         // Sheets will be updated after post-default multi-stage completes
         updateSheetsView();
