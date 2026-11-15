@@ -2029,8 +2029,8 @@ async function onChatCompletionPromptReady(eventData) {
                 lastContent = `<lastusermessage>\n${lastContent}\n</lastusermessage>`;
                 stmBaseA[lastUserIdx].content = lastContent;
             }
-            let stmBase = __stripTagBlocksFromText(flattenChat(stmBaseA), __STAGE_INSTRUCTION_TAGS).trim();
-            //let stmBase2 = __stripTagBlocksFromText(stmBase, __TP_INSTRUCTION_TAGS).trim();
+            let stmBase2 = __stripTagBlocksFromText(flattenChat(stmBaseA), __STAGE_INSTRUCTION_TAGS).trim();
+            let stmBase = __stripTagBlocksFromText(stmBase2, __TP_INSTRUCTION_TAGS).trim();
             window.__stm_ms_state.pendingMultiStage = { stmBase, mainTableEditPrompt, ts: Date.now() };
         }
         // Inject THINKING into outgoing chat for default LLM
