@@ -30,7 +30,7 @@ const editErrorInfo = {
     forgotCommentTag: false,
     functionNameError: false,
 };
-
+let globalNames = { userName: '<USER>', charName: '<CHAR>' };
 // Extend multi-stage state (add pendingMultiStage)
 window.__stm_ms_state = {
     inProgress: false,
@@ -2034,6 +2034,9 @@ async function onChatCompletionPromptReady(eventData) {
             let stmBase = __stripTagBlocksFromText(stmBase2, __TP_INSTRUCTION_TAGS).trim();
             window.__stm_ms_state.pendingMultiStage = { stmBase, mainTableEditPrompt, ts: Date.now() };
         }
+        const { userName, charName } = getCurrentChatNames();
+        globalNames.userName = userName;
+        globalNames.charName = charName;
         // Inject THINKING into outgoing chat for default LLM
         __applyThinkingInjection(eventData);     
         
@@ -2195,10 +2198,10 @@ function getLatestAssistantCriticalThinkingSection() {
     return '';
 }
 const __applyNameMacros = (s) => {
-    const { userName, charName } = getCurrentChatNames();
+    //const { userName, charName } = getCurrentChatNames();
     return s
-        .replace(/{{user}}/gi, userName)
-        .replace(/{{char}}/gi, charName);
+        .replace(/{{user}}/gi, globalNames.userName)
+        .replace(/{{char}}/gi, globalNames.charName);
 };
 // PATCH: enhance thinking data to support multi previous critical thinking sections (CRM setting)
 function initThinkingData(eventData) {
