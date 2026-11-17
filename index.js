@@ -2035,8 +2035,10 @@ async function onChatCompletionPromptReady(eventData) {
             window.__stm_ms_state.pendingMultiStage = { stmBase, mainTableEditPrompt, ts: Date.now() };
         }
         const { userName, charName } = getCurrentChatNames();
-        globalNames.userName = userName;
-        globalNames.charName = charName;
+
+        if (userName?.trim()) globalNames.userName = userName;
+        if (charName?.trim()) globalNames.charName = charName;
+
         // Inject THINKING into outgoing chat for default LLM
         __applyThinkingInjection(eventData);     
         
