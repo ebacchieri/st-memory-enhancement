@@ -1135,7 +1135,8 @@ async function __runPostDefaultMultiStage(stmBase, thinking_raw, assistantIndex)
     if (enableMain && (mainTpl || mainOnlyTableEditPrompt)) {
         let mainPrompt = [
             expand(mainTpl, {
-                ...ctx,
+                user: globalNames.userName,
+                char: globalNames.charName,
                 thinking: thinking_content
             }),
             mainOnlyTableEditPrompt,
@@ -1157,7 +1158,8 @@ async function __runPostDefaultMultiStage(stmBase, thinking_raw, assistantIndex)
     if (narrationTpl) {
         let narrationPrompt = [
             expand(narrationTpl, {
-                ...ctx,
+                user: globalNames.userName,
+                char: globalNames.charName,
                 main: __stripTableEditBlocks(mainResp),
                 thinking: thinking_content    
             })
@@ -1185,7 +1187,8 @@ async function __runPostDefaultMultiStage(stmBase, thinking_raw, assistantIndex)
         let summaryPrompt = [
             `<PREVIOUS_SUMMARY>\n${previousSummary || '(none)'}\n</PREVIOUS_SUMMARY>`,
             expand(longTermSummaryTpl, {
-                ...ctx,
+                user: globalNames.userName,
+                char: globalNames.charName,
                 narration: narrationResp,
                 thinking: thinking_content, 
                 main: __stripTableEditBlocks(mainResp)
