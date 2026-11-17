@@ -1067,7 +1067,7 @@ async function __runPostDefaultMultiStage(stmBase, thinking_raw, assistantIndex)
 
     let thinking_content = __stripTagBlocksFromText(text || '', __STAGE_INSTRUCTION_TAGS).trim();
 
-
+    const ctx = USER.getContext();
     const previousSummary = getLongTermSummary();
     const expand = (tpl, ctx) => __expandTemplateMacros(tpl, ctx);
     const maxAttemptsSetting = 5;
@@ -1127,7 +1127,7 @@ async function __runPostDefaultMultiStage(stmBase, thinking_raw, assistantIndex)
     }
 
     // We already have a default LLM response at assistantIndex; append our stages onto that message
-    const ctx = USER.getContext();
+    
 
     // MAIN
     let mainResp = '';
@@ -1135,6 +1135,7 @@ async function __runPostDefaultMultiStage(stmBase, thinking_raw, assistantIndex)
     if (enableMain && (mainTpl || mainOnlyTableEditPrompt)) {
         let mainPrompt = [
             expand(mainTpl, {
+                ...ctx,
                 thinking: thinking_content
             }),
             mainOnlyTableEditPrompt,
@@ -1155,7 +1156,8 @@ async function __runPostDefaultMultiStage(stmBase, thinking_raw, assistantIndex)
     let narrationResp = '';
     if (narrationTpl) {
         let narrationPrompt = [
-            expand(narrationTpl, {                
+            expand(narrationTpl, {
+                ...ctx,
                 main: __stripTableEditBlocks(mainResp),
                 thinking: thinking_content    
             })
@@ -1183,6 +1185,7 @@ async function __runPostDefaultMultiStage(stmBase, thinking_raw, assistantIndex)
         let summaryPrompt = [
             `<PREVIOUS_SUMMARY>\n${previousSummary || '(none)'}\n</PREVIOUS_SUMMARY>`,
             expand(longTermSummaryTpl, {
+                ...ctx,
                 narration: narrationResp,
                 thinking: thinking_content, 
                 main: __stripTableEditBlocks(mainResp)
