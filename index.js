@@ -828,6 +828,7 @@ const applyReplaceInPlace = (target, regexOrText, replacement = '') => {
 function __applyThinkingInjection(eventData) {
     try {
         const S = USER.tableBaseSetting || {};
+        let deepCount = S.deep;
         const enableThinking = S.enable_thinking_stage !== false;
         const thinkingTpl = enableThinking ? (S.thinking_template || '').trim() : '';
         if (!enableThinking || !thinkingTpl) return;
@@ -837,7 +838,7 @@ function __applyThinkingInjection(eventData) {
 
         let lastUserIdx = -1;
         for (let i = eventData.chat.length - 1; i >= 0; i--) {
-            if (eventData.chat[i]?.role === 'user') { lastUserIdx = i; break; }
+            if (eventData.chat[i]?.role === 'user') { lastUserIdx = i; deepCount--; if (deepCount <= 0) break; }
         }
 
         const wrapped = __wrapInstructionTag('thinkinginstructions', thinkingContent.trim());
@@ -847,7 +848,7 @@ function __applyThinkingInjection(eventData) {
         if (lastUserIdx !== -1) {
             const prev = eventData.chat[lastUserIdx].content || '';
             //const prevClean = __stripTagBlocksFromText(prev, __MP_INSTRUCTION_TAGS);
-            eventData.chat[lastUserIdx].content = `${wrapped}\n\n${prev}`;
+            eventData.chat[lastUserIdx].content = `${prev}\n\n${wrapped}`;
         } else {
             const role = getMesRole() || 'system';
             eventData.chat.push({ role, content: wrapped });
@@ -860,10 +861,10 @@ function __applyThinkingInjection(eventData) {
 function __applyMemoryInjection(eventData, promptContent) {
     try {
         const S = USER.tableBaseSetting || {};
-        
+        let deepCount = S.deep;
         let lastUserIdx = -1;
         for (let i = eventData.chat.length - 1; i >= 0; i--) {
-            if (eventData.chat[i]?.role === 'user') { lastUserIdx = i; break; }
+            if (eventData.chat[i]?.role === 'user') { lastUserIdx = i; deepCount--; if (deepCount <= 0) break; }
         }
 
         const wrapped = `<memory>\n${promptContent}\n</memory>`;
