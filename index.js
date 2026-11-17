@@ -2034,7 +2034,7 @@ async function onChatCompletionPromptReady(eventData) {
             let stmBase = __stripTagBlocksFromText(stmBase2, __TP_INSTRUCTION_TAGS).trim();
             window.__stm_ms_state.pendingMultiStage = { stmBase, mainTableEditPrompt, ts: Date.now() };
         }
-        const { userName, charName } = getCurrentChatNames();
+        let { userName, charName } = getCurrentChatNames();
 
         if (userName.trim().length > 0) {
             globalNames.userName = userName;
