@@ -2036,8 +2036,12 @@ async function onChatCompletionPromptReady(eventData) {
         }
         const { userName, charName } = getCurrentChatNames();
 
-        if (userName?.trim()) globalNames.userName = userName;
-        if (charName?.trim()) globalNames.charName = charName;
+        if (userName.trim().length > 0) {
+            globalNames.userName = userName;
+        }
+        if (charName.trim().length > 0) {
+            globalNames.charName = charName;
+        }
 
         // Inject THINKING into outgoing chat for default LLM
         __applyThinkingInjection(eventData);     
