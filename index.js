@@ -854,17 +854,7 @@ function extractInstructionsFromChat(eventData) {
         tpBlocks,
     };
 }
-function splitMpInstructions(text) {
-    const re = /<mpinstructions\b[^>]*>([\s\S]*?)<\/mpinstructions>/gi;
 
-    const blocks = [];
-    const rest = text.replace(re, (_, inner) => {
-        blocks.push(inner);
-        return '';
-    });
-
-    return { rest, blocks, combined: blocks.join('\n\n') };
-}
 
 
 // NEW: Inject only thinking content into the prompt we send to the LLM (no cancellation)
@@ -1093,6 +1083,15 @@ function __toPromptChat(chat) {
     });
 }
 
+function splitMpInstructions(text) {
+    const re = /<mpinstructions\b[^>]*>([\s\S]*?)<\/mpinstructions>/gi;
+    const blocks = [];
+    const rest = text.replace(re, (_, inner) => {
+        blocks.push(inner);
+        return '';
+    });
+    return { rest, blocks, combined: blocks.join('\n\n') };
+}
 
 // NEW: Post-default multi-stage runner that updates ONLY the last assistant message
 async function __runPostDefaultMultiStage(stmBase, thinking_raw, assistantIndex) {
