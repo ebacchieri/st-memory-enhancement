@@ -823,6 +823,51 @@ const applyReplaceInPlace = (target, regexOrText, replacement = '') => {
     return target;
 };
 
+function extractInstructionsFromChat(eventData) {
+    const mpRe = /<mpinstructions\b[^>]*>([\s\S]*?)<\/mpinstructions>/gi;
+    const tpRe = /<tpinstructions\b[^>]*>([\s\S]*?)<\/tpinstructions>/gi;
+
+    const mpBlocks = [];
+    const tpBlocks = [];
+
+    for (let i = 0; i < eventData.chat.length; i++) {
+        const msg = eventData.chat[i];
+        if (typeof msg?.content !== 'string') continue;
+
+        // cut mp blocks out of this message, collect inner text
+        msg.content = msg.content.replace(mpRe, (_, inner) => {
+            mpBlocks.push(inner);
+            return '';
+        });
+
+        // cut tp blocks out of this message, collect inner text
+        msg.content = msg.content.replace(tpRe, (_, inner) => {
+            tpBlocks.push(inner);
+            return '';
+        });
+    }
+
+    return {
+        mp: mpBlocks.join('\n\n'),   // combined <mpinstructions> blocks
+        tp: tpBlocks.join('\n\n'),   // combined <tpinstructions> blocks
+        mpBlocks,                    // individual blocks, if you need them
+        tpBlocks,
+    };
+}
+function splitMpInstructions(text) {
+    const re = /<mpinstructions>([\s\S]*?)<\/mpinstructions>/gi;
+
+    // 1. Collect the inner content of every block
+    const blocks = [...text.matchAll(re)].map(m => m[1]);
+
+    // 2. Remove the blocks (tags included) from the original
+    const rest = text.replace(re, '');
+
+    // 3. Compose the extracted blocks into one string
+    const combined = blocks.join('\n\n');
+
+    return { rest, blocks, combined };
+}
 
 // NEW: Inject only thinking content into the prompt we send to the LLM (no cancellation)
 function __applyThinkingInjection(eventData) {
@@ -836,19 +881,21 @@ function __applyThinkingInjection(eventData) {
         const thinkingContent = initThinkingData(eventData);
         if (!thinkingContent || !thinkingContent.trim()) return;
 
-        let lastUserIdx = -1;
-        for (let i = eventData.chat.length - 1; i >= 0; i--) {
-            if (eventData.chat[i]?.role === 'user') { lastUserIdx = i; deepCount--; if (deepCount <= 0) break; }
-        }
+        // let lastUserIdx = -1;
+        // for (let i = eventData.chat.length - 1; i >= 0; i--) {
+        //     if (eventData.chat[i]?.role === 'user') { lastUserIdx = i; deepCount--; if (deepCount <= 0) break; }
+        // }
+        let { mp, tp } = extractInstructionsFromChat(eventData);
 
-        const wrapped = __wrapInstructionTag('thinkinginstructions', thinkingContent.trim());
-        eventData.chat.forEach(m => {
-            if (typeof m.content === 'string') m.content = __stripTagBlocksFromText(m.content, __MP_INSTRUCTION_TAGS);
-        });
+       
+        const wrapped = __wrapInstructionTag('thinkinginstructions', thinkingContent.trim()).replace('{{anchor}}', tp);
+        // eventData.chat.forEach(m => {
+        //     if (typeof m.content === 'string') m.content = __stripTagBlocksFromText(m.content, __MP_INSTRUCTION_TAGS);
+        // });
         if (lastUserIdx !== -1) {
-            const prev = eventData.chat[lastUserIdx].content || '';
-            //const prevClean = __stripTagBlocksFromText(prev, __MP_INSTRUCTION_TAGS);
-            eventData.chat[lastUserIdx].content = `${prev}\n\n${wrapped}`;
+            eventData.chat.forEach(m => {
+                if (typeof m.content === 'string') m.content = m.content.replace('{{prompt}}', wrapped)
+            });
         } else {
             const role = getMesRole() || 'system';
             eventData.chat.push({ role, content: wrapped });
@@ -867,7 +914,7 @@ function __applyMemoryInjection(eventData, promptContent) {
             if (eventData.chat[i]?.role === 'user') { lastUserIdx = i; deepCount--; if (deepCount <= 0) break; }
         }
 
-        const wrapped = `<memory>\n${promptContent}\n</memory>`;
+        const wrapped = `<memory>\n${promptContent}\n</memory>\n\n{{prompt}}`;
 
 
         if (lastUserIdx !== -1) {
@@ -1143,7 +1190,9 @@ async function __runPostDefaultMultiStage(stmBase, thinking_raw, assistantIndex)
             mainOnlyTableEditPrompt,
         ].filter(Boolean).join('\n\n');
         mainPrompt = __applyNameMacros(mainPrompt);
-        let mainPromptA = stmBase + '\n' + __wrapInstructionTag('maininstructions', mainPrompt);
+        let { rest, blocks, combined } = splitMpInstructions(stmBase);
+
+        let mainPromptA = rest.replace('{{prompt}}', __wrapInstructionTag('maininstructions', mainPrompt).replace('{{anchor}}', combined));
 
         //mainPromptA=applyReplaceInPlace(mainPromptA, /<_beat>[\s\S]*?<\/_beat>/gi, '');
         // MAIN stage: sanitize returned content before reusing in later stages
