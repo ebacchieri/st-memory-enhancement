@@ -855,19 +855,17 @@ function extractInstructionsFromChat(eventData) {
     };
 }
 function splitMpInstructions(text) {
-    const re = /<mpinstructions>([\s\S]*?)<\/mpinstructions>/gi;
+    const re = /<mpinstructions\b[^>]*>([\s\S]*?)<\/mpinstructions>/gi;
 
-    // 1. Collect the inner content of every block
-    const blocks = [...text.matchAll(re)].map(m => m[1]);
+    const blocks = [];
+    const rest = text.replace(re, (_, inner) => {
+        blocks.push(inner);
+        return '';
+    });
 
-    // 2. Remove the blocks (tags included) from the original
-    const rest = text.replace(re, '');
-
-    // 3. Compose the extracted blocks into one string
-    const combined = blocks.join('\n\n');
-
-    return { rest, blocks, combined };
+    return { rest, blocks, combined: blocks.join('\n\n') };
 }
+
 
 // NEW: Inject only thinking content into the prompt we send to the LLM (no cancellation)
 function __applyThinkingInjection(eventData) {
@@ -881,10 +879,10 @@ function __applyThinkingInjection(eventData) {
         const thinkingContent = initThinkingData(eventData);
         if (!thinkingContent || !thinkingContent.trim()) return;
 
-        // let lastUserIdx = -1;
-        // for (let i = eventData.chat.length - 1; i >= 0; i--) {
-        //     if (eventData.chat[i]?.role === 'user') { lastUserIdx = i; deepCount--; if (deepCount <= 0) break; }
-        // }
+         let lastUserIdx = -1;
+         for (let i = eventData.chat.length - 1; i >= 0; i--) {
+             if (eventData.chat[i]?.role === 'user') { lastUserIdx = i; deepCount--; if (deepCount <= 0) break; }
+         }
         let { mp, tp } = extractInstructionsFromChat(eventData);
 
        
