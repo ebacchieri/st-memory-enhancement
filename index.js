@@ -876,13 +876,13 @@ function __applyThinkingInjection(eventData) {
         let { mp, tp } = extractInstructionsFromChat(eventData);
 
        
-        const wrapped = __wrapInstructionTag('thinkinginstructions', thinkingContent.trim()).replace('{{anchor}}', tp);
+        const wrapped = __wrapInstructionTag('thinkinginstructions', thinkingContent.trim()).replace('<anchor>', tp);
         // eventData.chat.forEach(m => {
         //     if (typeof m.content === 'string') m.content = __stripTagBlocksFromText(m.content, __MP_INSTRUCTION_TAGS);
         // });
         if (lastUserIdx !== -1) {
             eventData.chat.forEach(m => {
-                if (typeof m.content === 'string') m.content = m.content.replace('{{prompt}}', wrapped)
+                if (typeof m.content === 'string') m.content = m.content.replace('<prompt>', wrapped)
             });
         } else {
             const role = getMesRole() || 'system';
@@ -908,7 +908,7 @@ function __applyMemoryInjection(eventData, promptContent) {
         if (lastUserIdx !== -1) {
             const prev = eventData.chat[lastUserIdx].content || '';
             //const prevClean = __stripTagBlocksFromText(prev, __STAGE_INSTRUCTION_TAGS);
-            eventData.chat[lastUserIdx].content = `${wrapped}\n\n${prev}\n\n{{prompt}}`;
+            eventData.chat[lastUserIdx].content = `${wrapped}\n\n${prev}\n\n<prompt>`;
         } else {
             const role = getMesRole() || 'system';
             eventData.chat.push({ role, content: wrapped });
@@ -1188,10 +1188,10 @@ async function __runPostDefaultMultiStage(stmBase, thinking_raw, assistantIndex)
         ].filter(Boolean).join('\n\n');
         mainPrompt = __applyNameMacros(mainPrompt);
         const { rest, blocks, combined } = splitMpInstructions(stmBase);
-        // const filledPrompt = mainPrompt.replace('{{anchor}}', () => combined);
-        const wrapped = __wrapInstructionTag('maininstructions', mainPrompt);
+        const filledPrompt = mainPrompt.replace('<anchor>', () => combined);
+        const wrapped = __wrapInstructionTag('maininstructions', filledPrompt);
 
-        let mainPromptA = rest.replace('{{prompt}}', () => wrapped);
+        let mainPromptA = rest.replace('<prompt>', () => wrapped);
 
         //mainPromptA=applyReplaceInPlace(mainPromptA, /<_beat>[\s\S]*?<\/_beat>/gi, '');
         // MAIN stage: sanitize returned content before reusing in later stages
