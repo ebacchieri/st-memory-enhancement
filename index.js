@@ -902,13 +902,13 @@ function __applyMemoryInjection(eventData, promptContent) {
             if (eventData.chat[i]?.role === 'user') { lastUserIdx = i; deepCount--; if (deepCount <= 0) break; }
         }
 
-        const wrapped = `<memory>\n${promptContent}\n</memory>\n\n{{prompt}}`;
+        const wrapped = `<memory>\n${promptContent}\n</memory>`;
 
 
         if (lastUserIdx !== -1) {
             const prev = eventData.chat[lastUserIdx].content || '';
             //const prevClean = __stripTagBlocksFromText(prev, __STAGE_INSTRUCTION_TAGS);
-            eventData.chat[lastUserIdx].content = `${wrapped}\n\n${prev}`;
+            eventData.chat[lastUserIdx].content = `${wrapped}\n\n${prev}\n\n{{prompt}}`;
         } else {
             const role = getMesRole() || 'system';
             eventData.chat.push({ role, content: wrapped });
@@ -1189,7 +1189,7 @@ async function __runPostDefaultMultiStage(stmBase, thinking_raw, assistantIndex)
         mainPrompt = __applyNameMacros(mainPrompt);
         const { rest, blocks, combined } = splitMpInstructions(stmBase);
         const wrapped = __wrapInstructionTag('maininstructions', mainPrompt).replace('{{anchor}}', combined);
-        let mainPromptA = stmBase.replace('{{prompt}}', wrapped);
+        let mainPromptA = rest.replace('{{prompt}}', wrapped)+combined+combined;
 
         //mainPromptA=applyReplaceInPlace(mainPromptA, /<_beat>[\s\S]*?<\/_beat>/gi, '');
         // MAIN stage: sanitize returned content before reusing in later stages
