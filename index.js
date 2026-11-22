@@ -1190,7 +1190,7 @@ async function __runPostDefaultMultiStage(stmBase, thinking_raw, assistantIndex)
         mainPrompt = __applyNameMacros(mainPrompt);
         const { rest, blocks, combined } = splitMpInstructions(stmBase);
         const wrapped = __wrapInstructionTag('maininstructions', mainPrompt).replace('{{anchor}}', combined);
-        let mainPromptA = rest.replace('{{prompt}}', wrapped);
+        let mainPromptA = stmBase.replace('{{prompt}}', wrapped);
 
         //mainPromptA=applyReplaceInPlace(mainPromptA, /<_beat>[\s\S]*?<\/_beat>/gi, '');
         // MAIN stage: sanitize returned content before reusing in later stages
